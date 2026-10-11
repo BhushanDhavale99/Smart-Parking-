@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase, authStorage } from "@/integrations/supabase/client";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
@@ -18,6 +18,8 @@ import {
 } from "lucide-react";
 import parkGridLogo from "@/assets/parkgrid-logo.png";
 import { soundFX } from "@/components/effects/soundEffects";
+import { Lightspeed } from "@/components/effects/Lightspeed";
+import { AnimatedLogo } from "@/components/animated-logo";
 import "./LoginPage.css";
 
 interface LoginPageProps {
@@ -51,6 +53,15 @@ export function LoginPage({ onLoginSuccess, standalone = false }: LoginPageProps
   const [forgotModalOpen, setForgotModalOpen] = useState(false);
   const [forgotEmail, setForgotEmail] = useState("");
   const [forgotSent, setForgotSent] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setIsMobile(window.innerWidth < 768);
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   const validateEmail = (val: string) => {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val.trim());
@@ -187,6 +198,31 @@ export function LoginPage({ onLoginSuccess, standalone = false }: LoginPageProps
 
   return (
     <div className={`login-page-container ${isExiting ? "login-exit-animation" : ""}`}>
+      {/* ── Lightspeed Animated Background (fixed full-screen behind card) ── */}
+      <div
+        className="fixed inset-0 w-screen h-screen z-0 pointer-events-none overflow-hidden"
+        aria-hidden="true"
+      >
+        <Lightspeed
+          primaryColor="#00E5FF"
+          secondaryColor="#0288D1"
+          tertiaryColor="#FF9F1C"
+          speed={0.4}
+          intensity={0.9}
+          opacity={0.8}
+          streakCount={isMobile ? 64 : 96}
+          stretchFactor={1.2}
+          maxFPS={isMobile ? 30 : 45}
+          pauseWhenOffscreen={true}
+          interactionEnabled={false}
+        />
+        {/* Subtle radial dark overlay (vignette) behind card area for high contrast */}
+        <div
+          className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(6,9,19,0.72)_0%,rgba(6,9,19,0.25)_55%,rgba(6,9,19,0.88)_100%)] pointer-events-none"
+          aria-hidden="true"
+        />
+      </div>
+
       {/* ── Background Aesthetics ── */}
       <div className="login-grid-bg" aria-hidden="true" />
       <div className="login-glow-primary" aria-hidden="true" />
@@ -198,7 +234,7 @@ export function LoginPage({ onLoginSuccess, standalone = false }: LoginPageProps
         {/* Top Branding Header */}
         <div className="text-center mb-6">
           <div className="inline-flex items-center justify-center p-2 rounded-xl bg-background/60 border border-primary/40 shadow-[0_0_24px_rgba(0,242,254,0.2)] mb-3.5">
-            <img src={parkGridLogo} alt="ParkGrid" className="size-10 object-contain" />
+            <AnimatedLogo src={parkGridLogo} alt="ParkGrid" className="size-10 object-contain" />
           </div>
 
           <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-primary flex items-center justify-center gap-1.5 mb-1.5">

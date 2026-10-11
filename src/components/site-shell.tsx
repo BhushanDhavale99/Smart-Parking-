@@ -23,6 +23,7 @@ import type { Session } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import parkGridLogo from "@/assets/parkgrid-logo.png";
+import { AnimatedLogo } from "@/components/animated-logo";
 import { ThemeSelector } from "@/components/ThemeSelector";
 import { NavigationProgress } from "@/components/navigation-progress";
 
@@ -66,7 +67,12 @@ export function BrandMark({ compact = false }: { compact?: boolean }) {
   return (
     <span className="flex items-center gap-2.5">
       <span className="grid size-12 sm:size-14 shrink-0 place-items-center overflow-hidden rounded-lg border border-primary/30 bg-background shadow-[0_0_20px_var(--primary-glow)]">
-        <img src={parkGridLogo} alt="ParkGrid One" className="size-full object-cover" />
+        <AnimatedLogo
+          src={parkGridLogo}
+          alt="ParkGrid One"
+          className="size-full"
+          imgClassName="object-cover"
+        />
       </span>
       {!compact && (
         <span>
