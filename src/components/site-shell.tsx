@@ -1,5 +1,5 @@
-import { lazy, Suspense, useEffect, useLayoutEffect, useState } from "react";
-import { Link, useRouterState } from "@tanstack/react-router";
+import { lazy, Suspense, useEffect, useState } from "react";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   Bot,
   Menu,
@@ -16,7 +16,10 @@ import {
   ChevronRight,
   ChevronDown,
   HelpCircle,
+  LogOut,
 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import type { Session } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import parkGridLogo from "@/assets/parkgrid-logo.png";
@@ -38,7 +41,6 @@ function replayParkingIntro() {
     window.dispatchEvent(new CustomEvent("replay-parking-intro"));
   }
 }
-import { LoginPage } from "@/components/LoginPage";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -79,29 +81,71 @@ export function BrandMark({ compact = false }: { compact?: boolean }) {
 }
 
 export function SiteShell({ children }: { children: React.ReactNode }) {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    return sessionStorage.getItem("parkgrid_authenticated") === "true";
-  });
+  const [session, setSession] = useState<Session | null>(null);
+  const [authInitialized, setAuthInitialized] = useState(false);
+  const navigate = useNavigate();
 
-  useLayoutEffect(() => {
-    if (sessionStorage.getItem("parkgrid_authenticated") === "true") {
-      setIsAuthenticated(true);
-    }
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setAuthInitialized(true);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      setAuthInitialized(true);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
+
   const [open, setOpen] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const path = useRouterState({ select: (state) => state.location.pathname });
+
+  useEffect(() => {
+    if (!session?.user?.id) {
+      setIsAdmin(false);
+      return;
+    }
+    let isMounted = true;
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", session.user.id)
+          .maybeSingle();
+
+        if (isMounted) {
+          setIsAdmin(!error && data?.role === "admin");
+        }
+      } catch {
+        if (isMounted) setIsAdmin(false);
+      }
+    })();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [session?.user?.id]);
   const isHomePage = path === "/";
+  const isAuthPage = path === "/login" || path.startsWith("/auth/");
+
   useEffect(() => {
     const listener = () => setScrolled(window.scrollY > 24);
     listener();
     window.addEventListener("scroll", listener, { passive: true });
     return () => window.removeEventListener("scroll", listener);
   }, []);
+
   useEffect(() => {
     setOpen(false);
   }, [path]);
+
   useEffect(() => {
     const close = (event: KeyboardEvent) => {
       if (event.key === "Escape") setOpen(false);
@@ -111,35 +155,57 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    const handleLogout = () => {
+    const handleLogout = async () => {
+      await supabase.auth.signOut();
       sessionStorage.removeItem("parkgrid_authenticated");
       sessionStorage.removeItem("parkgrid_seen_intro");
-      setIsAuthenticated(false);
+      setSession(null);
+      navigate({ to: "/login" });
     };
     window.addEventListener("parkgrid-logout", handleLogout);
     return () => window.removeEventListener("parkgrid-logout", handleLogout);
-  }, []);
+  }, [navigate]);
+
+  useEffect(() => {
+    if (!authInitialized) return;
+    const isProtected =
+      path === "/" ||
+      [
+        "/bookings",
+        "/checkout",
+        "/confirmation",
+        "/vehicles",
+        "/notifications",
+        "/profile",
+        "/admin",
+      ].some((prefix) => path === prefix || path.startsWith(`${prefix}/`));
+
+    if (isProtected && !session) {
+      if (path === "/") {
+        navigate({ to: "/login" });
+      } else {
+        navigate({
+          to: "/login",
+          search: { redirect: path },
+        });
+      }
+    }
+  }, [authInitialized, session, path, navigate]);
 
   /* Helper: is path active for a link */
   const isActive = (to: string) => path === to || (to !== "/" && path.startsWith(`${to}/`));
   /* Is any support page active */
   const supportActive = supportLinks.some(([to]) => isActive(to));
 
-  if (!isAuthenticated) {
+  const isAdminRoute = path === "/admin" || path.startsWith("/admin/");
+
+  if (isAuthPage || isAdminRoute) {
     return (
       <div className="min-h-screen bg-background text-foreground">
-        {/* CustomCursor intentionally omitted on login — its rAF loop starts immediately
-            and would block main-thread interactivity before the user has logged in. */}
-        <LoginPage
-          onLoginSuccess={() => {
-            sessionStorage.setItem("parkgrid_authenticated", "true");
-            sessionStorage.removeItem("parkgrid_seen_intro");
-            setIsAuthenticated(true);
-            // No setTimeout — replay is dispatched as a CustomEvent; OpeningAnimation
-            // picks it up once it mounts (post-auth) via its own event listener.
-            replayParkingIntro();
-          }}
-        />
+        <NavigationProgress />
+        <main id="main-content" className="relative min-h-screen">
+          {children}
+        </main>
       </div>
     );
   }
@@ -187,6 +253,20 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
               );
             })}
 
+            {isAdmin && (
+              <Link
+                to="/admin"
+                aria-current={isActive("/admin") ? "page" : undefined}
+                className={cn(
+                  "relative whitespace-nowrap rounded-md px-2.5 xl:px-3 py-2 text-xs font-medium transition-colors duration-250 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring text-amber-400/90 hover:text-amber-300",
+                  isActive("/admin") &&
+                    "text-amber-400 font-semibold after:absolute after:inset-x-2.5 xl:after:inset-x-3 after:bottom-1 after:h-px after:origin-left after:bg-amber-400 after:scale-x-100",
+                )}
+              >
+                Admin
+              </Link>
+            )}
+
             {/* Support dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -233,16 +313,26 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
               <Sparkles className="size-3.5 text-cyan-400" />
               <span className="font-mono text-[11px] uppercase tracking-wider">Intro</span>
             </Button>
-            <Link to="/profile" className="hidden sm:block" aria-label="Profile">
-              <Button size="icon" variant="ghost" aria-label="Profile">
-                <UserRound />
-              </Button>
-            </Link>
-            <Link to="/notifications" className="hidden sm:block" aria-label="Notifications">
-              <Button size="icon" variant="ghost" aria-label="Notifications">
-                <Bell />
-              </Button>
-            </Link>
+            {session ? (
+              <>
+                <Link to="/profile" className="hidden sm:block" aria-label="Profile">
+                  <Button size="icon" variant="ghost" aria-label="Profile">
+                    <UserRound />
+                  </Button>
+                </Link>
+                <Link to="/notifications" className="hidden sm:block" aria-label="Notifications">
+                  <Button size="icon" variant="ghost" aria-label="Notifications">
+                    <Bell />
+                  </Button>
+                </Link>
+              </>
+            ) : (
+              <Link to="/login" className="hidden sm:block">
+                <Button size="sm" variant="ghost" className="text-xs">
+                  Sign in
+                </Button>
+              </Link>
+            )}
             <Link to="/parking">
               <Button className="magnetic-cta">
                 Book now <ArrowUpRight className="transition-transform group-hover:translate-x-1" />
@@ -284,6 +374,19 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
                 {label}
               </Link>
             ))}
+            {isAdmin && (
+              <Link
+                to="/admin"
+                aria-current={path.startsWith("/admin") ? "page" : undefined}
+                onClick={() => setOpen(false)}
+                className="flex items-center justify-between rounded-md px-4 py-3 text-sm font-medium text-amber-400 transition hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <span>Admin Operations</span>
+                <span className="rounded border border-amber-400/30 bg-amber-400/10 px-1.5 py-0.5 font-mono text-[10px] text-amber-400">
+                  Admin
+                </span>
+              </Link>
+            )}
             {/* Support links in mobile nav */}
             <div className="border-t border-border/60 my-1 pt-1">
               <span className="block px-4 pt-2 pb-1 text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
@@ -319,6 +422,37 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
             >
               <Sparkles className="size-4" /> Watch Intro
             </button>
+            <div className="border-t border-border/80 my-1 pt-1">
+              {session ? (
+                <>
+                  <Link
+                    to="/profile"
+                    onClick={() => setOpen(false)}
+                    className="flex items-center gap-2 rounded-md px-4 py-3 text-sm transition hover:bg-accent"
+                  >
+                    <UserRound className="size-4" /> Profile & Settings
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOpen(false);
+                      window.dispatchEvent(new CustomEvent("parkgrid-logout"));
+                    }}
+                    className="flex w-full items-center gap-2 rounded-md px-4 py-3 text-left text-sm text-destructive transition hover:bg-accent"
+                  >
+                    <LogOut className="size-4" /> Sign out
+                  </button>
+                </>
+              ) : (
+                <Link
+                  to="/login"
+                  onClick={() => setOpen(false)}
+                  className="flex items-center gap-2 rounded-md px-4 py-3 text-sm text-primary font-medium transition hover:bg-accent"
+                >
+                  <UserRound className="size-4" /> Sign in
+                </Link>
+              )}
+            </div>
           </nav>
         </div>
       </header>

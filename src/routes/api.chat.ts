@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { createOpenAI } from "@ai-sdk/openai";
 import { convertToModelMessages, streamText, type UIMessage } from "ai";
 import { z } from "zod";
+import { getCurrentUser } from "@/lib/auth.server";
 
 const bodySchema = z.object({ messages: z.array(z.custom<UIMessage>()).max(30) });
 
@@ -9,6 +10,14 @@ export const Route = createFileRoute("/api/chat")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        const authUser = await getCurrentUser(request);
+        if (!authUser) {
+          return Response.json(
+            { message: "Authentication required to use the parking assistant." },
+            { status: 401 },
+          );
+        }
+
         const parsed = bodySchema.safeParse(await request.json());
         if (!parsed.success)
           return Response.json(

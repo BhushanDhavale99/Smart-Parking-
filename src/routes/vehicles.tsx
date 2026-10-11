@@ -1,5 +1,10 @@
 import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
+import { requireAuthGuard } from "@/lib/auth-guard";
+
 export const Route = createFileRoute("/vehicles")({
+  beforeLoad: async ({ location }) => {
+    await requireAuthGuard(location);
+  },
   head: () => ({
     meta: [
       { title: "Choose Vehicle — ParkGrid One" },

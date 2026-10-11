@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { supabase, authStorage } from "@/integrations/supabase/client";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
   AlertCircle,
@@ -12,7 +13,6 @@ import {
   Mail,
   RefreshCw,
   ShieldCheck,
-  Sparkles,
   User,
   X,
 } from "lucide-react";
@@ -42,9 +42,7 @@ export function LoginPage({ onLoginSuccess, standalone = false }: LoginPageProps
 
   // Status & validation states
   const [isLoading, setIsLoading] = useState(false);
-  const [loadingMethod, setLoadingMethod] = useState<"email" | "google" | "github" | "demo" | null>(
-    null,
-  );
+  const [loadingMethod, setLoadingMethod] = useState<"email" | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isExiting, setIsExiting] = useState(false);
@@ -59,36 +57,32 @@ export function LoginPage({ onLoginSuccess, standalone = false }: LoginPageProps
   };
 
   const handleCompleteAuth = (userName: string) => {
-    setIsLoading(true);
+    setIsLoading(false);
+    setLoadingMethod(null);
     setErrorMessage(null);
     setSuccessMessage(`Access Granted · Welcome, ${userName}`);
     soundFX.playGateUnlock();
 
-    // Persist login session
-    if (typeof window !== "undefined") {
-      sessionStorage.setItem("parkgrid_authenticated", "true");
-      sessionStorage.setItem("parkgrid_user_name", userName);
-    }
-
-    // Trigger subtle exit transition into intro animation
+    // Trigger subtle exit transition into intro animation.
+    // Session is already persisted by supabase-js (localStorage or sessionStorage
+    // depending on what authStorage.use() was called with before sign-in).
     setTimeout(() => {
       setIsExiting(true);
       setTimeout(() => {
-        if (standalone) {
-          navigate({ to: "/" });
-        }
         if (onLoginSuccess) {
           onLoginSuccess();
+        } else if (standalone) {
+          navigate({ to: "/" });
         }
       }, 500);
     }, 600);
   };
 
-  const handleEmailSubmit = (e: React.FormEvent) => {
+  const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
 
-    // Validation
+    // Client-side validation (hand-written, no library).
     if (!email.trim()) {
       setErrorMessage("Please enter your email address.");
       return;
@@ -101,8 +95,8 @@ export function LoginPage({ onLoginSuccess, standalone = false }: LoginPageProps
       setErrorMessage("Please enter your password.");
       return;
     }
-    if (password.length < 6) {
-      setErrorMessage("Password must be at least 6 characters.");
+    if (password.length < 8) {
+      setErrorMessage("Password must be at least 8 characters.");
       return;
     }
 
@@ -124,38 +118,65 @@ export function LoginPage({ onLoginSuccess, standalone = false }: LoginPageProps
     setIsLoading(true);
     setLoadingMethod("email");
 
-    // Realistic authentication delay simulation
-    setTimeout(() => {
-      handleCompleteAuth(mode === "signup" ? name : (email.split("@")[0] ?? "User"));
-    }, 700);
+    // Switch the supabase-js storage backend BEFORE signing in so new tokens
+    // land in the right store (localStorage = remember, sessionStorage = forget on close).
+    authStorage.use(rememberMe ? localStorage : sessionStorage);
+
+    if (mode === "signin") {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+
+      if (error) {
+        setIsLoading(false);
+        setLoadingMethod(null);
+        // Generic message: do not reveal whether the email exists.
+        setErrorMessage("Invalid email or password. Please try again.");
+        return;
+      }
+
+      handleCompleteAuth(email.split("@")[0] ?? "User");
+    } else {
+      const { data, error } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+        options: {
+          data: { full_name: name.trim() },
+        },
+      });
+
+      if (error) {
+        setIsLoading(false);
+        setLoadingMethod(null);
+        // Generic message: do not reveal whether the email already exists.
+        setErrorMessage("Sign up failed. Please try again or use a different email.");
+        return;
+      }
+
+      if (!data.session) {
+        // Email confirmation is enabled — let the user know.
+        setIsLoading(false);
+        setLoadingMethod(null);
+        setSuccessMessage("Account created! Please check your email to confirm your account.");
+        return;
+      }
+
+      handleCompleteAuth(name);
+    }
   };
 
-  const handleSocialLogin = (provider: "google" | "github") => {
-    setErrorMessage(null);
-    setIsLoading(true);
-    setLoadingMethod(provider);
-
-    setTimeout(() => {
-      handleCompleteAuth(provider === "google" ? "Google User" : "GitHub User");
-    }, 700);
-  };
-
-  const handleDemoLogin = () => {
-    setEmail("bhushan@parkgrid.one");
-    setPassword("parkgrid2026");
-    setIsLoading(true);
-    setLoadingMethod("demo");
-
-    setTimeout(() => {
-      handleCompleteAuth("Bhushan Dhavale");
-    }, 500);
-  };
-
-  const handleForgotPasswordSubmit = (e: React.FormEvent) => {
+  const handleForgotPasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!forgotEmail.trim() || !validateEmail(forgotEmail)) {
       return;
     }
+
+    // Always show success — do not reveal whether the email exists.
+    await supabase.auth.resetPasswordForEmail(forgotEmail.trim(), {
+      redirectTo: `${window.location.origin}/auth/reset-password`,
+    });
+
     setForgotSent(true);
     setTimeout(() => {
       setForgotModalOpen(false);
@@ -207,65 +228,6 @@ export function LoginPage({ onLoginSuccess, standalone = false }: LoginPageProps
             <span className="font-semibold">{successMessage}</span>
           </div>
         )}
-
-        {/* ── Social Login Buttons ── */}
-        <div className="space-y-2.5">
-          {/* Continue with Google */}
-          <button
-            type="button"
-            onClick={() => handleSocialLogin("google")}
-            disabled={isLoading}
-            className="login-social-btn"
-            aria-label="Continue with Google"
-          >
-            {loadingMethod === "google" ? (
-              <RefreshCw className="size-4 animate-spin text-primary" />
-            ) : (
-              <svg className="size-4" viewBox="0 0 24 24">
-                <path
-                  fill="#4285F4"
-                  d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"
-                />
-                <path
-                  fill="#34A853"
-                  d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.24v3.15C3.26 21.36 7.34 24 12 24z"
-                />
-                <path
-                  fill="#FBBC05"
-                  d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.24C.45 8.15 0 9.92 0 12s.45 3.85 1.24 5.42l4.04-3.15z"
-                />
-                <path
-                  fill="#EA4335"
-                  d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.34 0 3.26 2.64 1.24 6.58l4.04 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
-                />
-              </svg>
-            )}
-            <span>Continue with Google</span>
-          </button>
-
-          {/* Continue with GitHub */}
-          <button
-            type="button"
-            onClick={() => handleSocialLogin("github")}
-            disabled={isLoading}
-            className="login-social-btn"
-            aria-label="Continue with GitHub"
-          >
-            {loadingMethod === "github" ? (
-              <RefreshCw className="size-4 animate-spin text-primary" />
-            ) : (
-              <svg className="size-4 fill-current" viewBox="0 0 24 24">
-                <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
-              </svg>
-            )}
-            <span>Continue with GitHub</span>
-          </button>
-        </div>
-
-        {/* Divider OR */}
-        <div className="login-divider">
-          <span>Or with email</span>
-        </div>
 
         {/* ── Email & Password Form ── */}
         <form onSubmit={handleEmailSubmit} className="space-y-3.5">
@@ -440,18 +402,8 @@ export function LoginPage({ onLoginSuccess, standalone = false }: LoginPageProps
           </button>
         </form>
 
-        {/* ── Demo Quick Login Bypass ── */}
-        <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between text-xs">
-          <button
-            type="button"
-            onClick={handleDemoLogin}
-            disabled={isLoading}
-            className="flex items-center gap-1.5 text-cyan-400 hover:text-cyan-300 font-mono text-[11px] transition-colors"
-          >
-            <Sparkles className="size-3.5" />
-            <span>⚡ Quick Demo Access</span>
-          </button>
-
+        {/* 256-bit encrypted label */}
+        <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-end text-xs">
           <span className="text-[10px] font-mono text-muted-foreground/70">256-Bit Encrypted</span>
         </div>
 

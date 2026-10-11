@@ -1064,7 +1064,20 @@ export function LocationPage() {
   );
 }
 export function AssistantPage() {
-  const transport = useMemo(() => new DefaultChatTransport({ api: "/api/chat" }), []);
+  const transport = useMemo(
+    () =>
+      new DefaultChatTransport({
+        api: "/api/chat",
+        headers: async () => {
+          const { supabase } = await import("@/integrations/supabase/client");
+          const { data } = await supabase.auth.getSession();
+          return data.session?.access_token
+            ? { Authorization: `Bearer ${data.session.access_token}` }
+            : {};
+        },
+      }),
+    [],
+  );
   const { messages, sendMessage, status, stop, error } = useChat({ transport });
   const inputRef = useRef<HTMLTextAreaElement>(null);
   useEffect(() => {
@@ -1395,9 +1408,6 @@ export function AuthPage() {
             )}
             <Button size="lg" className="w-full">
               {signup ? "Create account" : "Log in"}
-            </Button>
-            <Button size="lg" variant="outline" className="w-full">
-              Continue with Google
             </Button>
           </div>
           <button
