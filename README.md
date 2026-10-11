@@ -166,7 +166,6 @@ Example concept:
                    ↓
              AVAILABLE SLOTS
 
-
 Create a premium 3D/illustrated vehicle or parking visual if possible.
 
 The vehicle should subtly move.
@@ -177,10 +176,9 @@ The entrance barrier can open when the vehicle approaches.
 
 Immediately below or beside the hero, show live parking statistics:
 
-TOTAL SLOTS       AVAILABLE       OCCUPIED       RESERVED
+TOTAL SLOTS AVAILABLE OCCUPIED RESERVED
 
-   150               73              62             15
-
+150 73 62 15
 
 Numbers should animate when the section appears.
 
@@ -200,10 +198,9 @@ Create a mini parking map on the homepage.
 
 Show several parking slots:
 
-A01   A02   A03   A04   A05
-A06   A07   A08   A09   A10
-B01   B02   B03   B04   B05
-
+A01 A02 A03 A04 A05
+A06 A07 A08 A09 A10
+B01 B02 B03 B04 B05
 
 Slots should have different states.
 
@@ -285,19 +282,18 @@ Create a visual step-by-step section:
 
 01
 Choose Date & Time
-       ↓
+↓
 02
 Select Parking Slot
-       ↓
+↓
 03
 Pay Securely
-       ↓
+↓
 04
 Get QR Pass
-       ↓
+↓
 05
 Park Easily
-
 
 Use animated connecting lines.
 
@@ -310,26 +306,25 @@ Create the main interactive booking interface.
 Layout:
 
 ┌──────────────────────────────────────────────┐
-│ Date   Time   Duration                       │
+│ Date Time Duration │
 ├──────────────────────────────────────────────┤
-│                                              │
-│          INTERACTIVE PARKING MAP             │
-│                                              │
-│ A01 A02 A03 A04 A05                         │
-│ B01 B02 B03 B04 B05                         │
-│ C01 C02 C03 C04 C05                         │
-│                                              │
+│ │
+│ INTERACTIVE PARKING MAP │
+│ │
+│ A01 A02 A03 A04 A05 │
+│ B01 B02 B03 B04 B05 │
+│ C01 C02 C03 C04 C05 │
+│ │
 ├──────────────────────┬───────────────────────┤
-│ Slot Information     │ Booking Summary       │
-│                      │                       │
-│ A12                  │ Slot: A12             │
-│ Available            │ Duration: 2 hours     │
-│ Car                  │ Vehicle: Car          │
-│                      │ Total: ₹118           │
-│                      │                       │
-│                      │ [Continue]            │
+│ Slot Information │ Booking Summary │
+│ │ │
+│ A12 │ Slot: A12 │
+│ Available │ Duration: 2 hours │
+│ Car │ Vehicle: Car │
+│ │ Total: ₹118 │
+│ │ │
+│ │ [Continue] │
 └──────────────────────┴───────────────────────┘
-
 
 11. Interactive Parking Map
 
@@ -357,11 +352,10 @@ Reserved parking
 
 Parking slot states:
 
-Green  → Available
-Red    → Occupied
+Green → Available
+Red → Occupied
 Yellow → Reserved
-Blue   → Selected
-
+Blue → Selected
 
 When clicking a slot:
 
@@ -379,7 +373,6 @@ Add floor/zone controls:
 
 [Zone A] [Zone B] [EV Zone]
 
-
 12. Parking Slot Interaction
 
 On hover:
@@ -389,7 +382,6 @@ Available
 Car
 ₹50/hour
 Floor 1
-
 
 On click:
 
@@ -415,7 +407,6 @@ MH12AB1234
 Petrol
 
 [Select]
-
 
 Allow:
 
@@ -452,18 +443,17 @@ Time
 Duration
 Vehicle
 
-
 Right side:
 
 Price Summary
 
-Parking       ₹100
-Tax            ₹18
+Parking ₹100
+Tax ₹18
 ------------------
-Total         ₹118
+
+Total ₹118
 
 [ Secure Payment ]
-
 
 Use a secure-payment visual indicator.
 
@@ -488,7 +478,6 @@ Date
 Time
 10:00 AM
 
-
 Display a large QR code.
 
 Buttons:
@@ -503,7 +492,6 @@ Add a subtle parking success animation:
 
 Car → Selected Slot → Parked
 
-
 16. My Bookings
 
 Create a dashboard-style booking page.
@@ -514,7 +502,6 @@ Upcoming
 Active
 Completed
 Cancelled
-
 
 Booking cards should show:
 
@@ -561,7 +548,6 @@ Entry
 Vehicle
 MH12AB1234
 
-
 Include:
 
 Animated countdown
@@ -593,7 +579,6 @@ Available
 
 [Book Charger]
 
-
 Use:
 
 Battery animation
@@ -610,7 +595,6 @@ Available
 Charging
 Reserved
 Offline
-
 
 19. Parking Information Page
 
@@ -673,7 +657,6 @@ Visually show:
                ↓
              EXIT
 
-
 21. AI Assistant
 
 Create a dedicated AI Parking Assistant page.
@@ -683,19 +666,18 @@ It should look like a premium AI product.
 Layout:
 
 ┌───────────────────────────────────────┐
-│         AI PARKING ASSISTANT          │
-│                                       │
-│  Ask anything about this parking     │
-│  facility                             │
-│                                       │
-│  "What are the parking rules?"       │
-│  "Is an EV slot available?"          │
-│  "What is the cancellation policy?"  │
-│                                       │
-│  ───────────────────────────────────  │
-│  Ask a question...              Send │
+│ AI PARKING ASSISTANT │
+│ │
+│ Ask anything about this parking │
+│ facility │
+│ │
+│ "What are the parking rules?" │
+│ "Is an EV slot available?" │
+│ "What is the cancellation policy?" │
+│ │
+│ ─────────────────────────────────── │
+│ Ask a question... Send │
 └───────────────────────────────────────┘
-
 
 Add suggested questions.
 
@@ -719,16 +701,13 @@ When answering, show subtle states:
 
 Searching parking information...
 
-
 or
 
 Checking live availability...
 
-
 or
 
 Finding your booking...
-
 
 Then show the answer.
 
@@ -750,7 +729,6 @@ Position:
 
 Bottom-right
 
-
 It should contain:
 
 AI icon
@@ -762,7 +740,6 @@ Small animation
 On hover:
 
 Ask Parking AI
-
 
 Clicking opens a chat panel.
 
@@ -783,7 +760,6 @@ AI Knowledge Base
 Settings
 Logout
 
-
 Dashboard cards:
 
 Total Slots
@@ -793,7 +769,6 @@ Reserved
 Today's Bookings
 Revenue
 Active Sessions
-
 
 25. Admin Live Parking Map
 
@@ -851,10 +826,9 @@ Edit
 Disable
 Delete
 
-
 Add:
 
-+ Add Parking Slot
+- Add Parking Slot
 
 27. Admin Booking Management
 
@@ -871,7 +845,6 @@ Time
 Amount
 Status
 Actions
-
 
 Include:
 
@@ -899,7 +872,6 @@ Embeddings
 Last Updated
 Status
 
-
 Document cards:
 
 Parking Rules.pdf
@@ -910,7 +882,6 @@ Cancellation Policy.pdf
 
 EV Charging.pdf
 ✓ Indexed
-
 
 Add:
 
@@ -925,7 +896,6 @@ Generating Embeddings
 Indexing
 Completed
 
-
 29. Notifications
 
 Create a notification center.
@@ -938,7 +908,6 @@ Parking Starting Soon
 Parking Expiring Soon
 Booking Cancelled
 EV Charging Completed
-
 
 Use notification badges and timestamps.
 
@@ -953,7 +922,6 @@ Payment Methods
 Notifications
 Security
 Logout
-
 
 Use clean settings cards.
 
@@ -975,7 +943,6 @@ Continue with Google
 Forgot Password?
 Don't have an account? Sign Up
 
-
 Signup:
 
 Create Your Account
@@ -986,7 +953,6 @@ Password
 Confirm Password
 
 [Create Account]
-
 
 Use subtle parking/vehicle visual elements in the background.
 
@@ -1040,26 +1006,23 @@ Car entering
 
 Car → Gate → Parking Area
 
-
 Gate opening
 
 Car approaches
-      ↓
+↓
 Barrier opens
-      ↓
+↓
 Car passes
-
 
 Booking animation
 
 Car
- ↓
+↓
 Selected Slot
- ↓
+↓
 Parking
- ↓
+↓
 Booking Confirmed
-
 
 QR animation
 
@@ -1115,7 +1078,6 @@ Example:
 
 Loading Parking Availability...
 
-
 Avoid blank screens.
 
 36. Empty States
@@ -1130,7 +1092,6 @@ You don't have any upcoming parking bookings.
 
 [Book Parking]
 
-
 Use appropriate illustrations/icons.
 
 37. Error States
@@ -1144,7 +1105,6 @@ Something went wrong.
 We couldn't load parking availability.
 
 [Try Again]
-
 
 Do not show raw technical errors to users.
 
@@ -1194,23 +1154,17 @@ Respect:
 
 prefers-reduced-motion
 
-
 40. Important Design Rule
 
 Do NOT make the website look like a basic CRUD dashboard.
 
 The user experience should feel like:
 
-Premium Automotive Website
-          +
-Smart City Platform
-          +
-Modern SaaS Dashboard
-          +
-Interactive Parking System
-          +
+Premium Automotive Website +
+Smart City Platform +
+Modern SaaS Dashboard +
+Interactive Parking System +
 AI Assistant
-
 
 41. Important Functional UI Rule
 
@@ -1221,22 +1175,20 @@ Do not hardcode the architecture into the UI.
 For example:
 
 Parking Availability
-        ↓
+↓
 API
-        ↓
+↓
 Database / Redis
-
 
 The UI should be ready to consume real data.
 
 Similarly:
 
 AI Chat
-   ↓
+↓
 /api/ai
-   ↓
+↓
 RAG + Live APIs
-
 
 42. Technology Requirements
 
@@ -1283,7 +1235,6 @@ DataTable
 StatusBadge
 LoadingSkeleton
 
-
 Keep components modular and reusable.
 
 44. Footer
@@ -1317,21 +1268,20 @@ The final website should feel like a real smart parking startup product.
 When a user opens the website, the experience should be:
 
 Premium Landing Page
-        ↓
+↓
 Live Parking Information
-        ↓
+↓
 Interactive Parking Map
-        ↓
+↓
 Easy Booking
-        ↓
+↓
 Secure Payment
-        ↓
+↓
 QR Parking Pass
-        ↓
+↓
 Real-Time Parking Session
-        ↓
+↓
 AI Parking Assistant
-
 
 The interface must be:
 

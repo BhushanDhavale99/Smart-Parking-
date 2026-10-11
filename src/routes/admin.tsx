@@ -1,20 +1,34 @@
-import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
+import { createFileRoute, Outlet } from "@tanstack/react-router";
+import { requireAdminGuard } from "@/lib/auth-guard";
+import { AdminLayout } from "@/components/admin/admin-layout";
+
 export const Route = createFileRoute("/admin")({
+  beforeLoad: async ({ location }) => {
+    await requireAdminGuard(location);
+  },
   head: () => ({
     meta: [
-      { title: "Operations Dashboard — ParkGrid One" },
+      { title: "ParkGrid Admin | Console" },
       {
         name: "description",
-        content: "Live parking operations, bookings, revenue, and slot management.",
+        content: "Facility administration, parking bay telemetry, and bookings.",
       },
-      { property: "og:title", content: "Operations Dashboard — ParkGrid One" },
+      { property: "og:title", content: "Operations Console — ParkGrid One" },
       {
         property: "og:description",
-        content: "Live parking operations, bookings, revenue, and slot management.",
+        content: "Facility administration, parking bay telemetry, and bookings.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
-  component: lazyRouteComponent(() => import("@/components/app-pages"), "AdminPage"),
+  component: AdminLayoutRoute,
 });
+
+function AdminLayoutRoute() {
+  return (
+    <AdminLayout>
+      <Outlet />
+    </AdminLayout>
+  );
+}
