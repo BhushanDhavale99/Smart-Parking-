@@ -21,13 +21,31 @@ export const Route = createFileRoute("/login")({
   },
   beforeLoad: async ({ search }) => {
     if (typeof window === "undefined") return;
-    const { supabase } = await import("@/integrations/supabase/client");
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (session) {
-      const target = search.redirect && search.redirect.startsWith("/") ? search.redirect : "/";
-      throw redirect({ to: target });
+    try {
+      const { supabase } = await import("@/integrations/supabase/client");
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (session) {
+        const target =
+          search.redirect &&
+          search.redirect.startsWith("/") &&
+          !search.redirect.startsWith("//") &&
+          !search.redirect.includes(":") &&
+          !search.redirect.includes("\\")
+            ? search.redirect
+            : "/";
+        throw redirect({ to: target, replace: true });
+      }
+    } catch (err) {
+      if (
+        err != null &&
+        typeof err === "object" &&
+        ("isRedirect" in err || "to" in err || "statusCode" in err)
+      ) {
+        throw err;
+      }
+      console.warn("Session check on login failed:", err);
     }
   },
   head: () => ({

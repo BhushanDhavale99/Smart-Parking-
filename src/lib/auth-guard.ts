@@ -26,16 +26,36 @@ export async function requireAuthGuard(location: { pathname: string }) {
   // handles the redirect after hydration; skip here to avoid SSR errors.
   if (typeof window === "undefined") return;
 
-  const { supabase } = await import("@/integrations/supabase/client");
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+  try {
+    const { supabase } = await import("@/integrations/supabase/client");
+    const {
+      data: { session },
+      error,
+    } = await supabase.auth.getSession();
 
-  if (!session) {
-    // Only allow same-origin relative redirect targets.
+    if (error || !session) {
+      // Only allow same-origin relative redirect targets.
+      const redirectTo = sanitizeRedirectTarget(location.pathname, "/");
+      throw redirect(
+        redirectTo === "/"
+          ? { to: "/login", replace: true }
+          : { to: "/login", search: { redirect: redirectTo }, replace: true },
+      );
+    }
+  } catch (err) {
+    if (
+      err != null &&
+      typeof err === "object" &&
+      ("isRedirect" in err || "to" in err || "statusCode" in err)
+    ) {
+      throw err;
+    }
+    console.warn("Session check failed or Supabase unreachable, redirecting to /login:", err);
     const redirectTo = sanitizeRedirectTarget(location.pathname, "/");
     throw redirect(
-      redirectTo === "/" ? { to: "/login" } : { to: "/login", search: { redirect: redirectTo } },
+      redirectTo === "/"
+        ? { to: "/login", replace: true }
+        : { to: "/login", search: { redirect: redirectTo }, replace: true },
     );
   }
 }

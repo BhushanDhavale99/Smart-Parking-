@@ -1,0 +1,125 @@
+/* ─────────────────────────────────────────────────────────────
+ * ParkGrid Premium Simplified Logo Animation
+ * Clean, restrained, and professional.
+ * Lightweight CSS transitions & keyframes (No WebGL/Canvas).
+ * ───────────────────────────────────────────────────────────── */
+
+@keyframes parkgrid-logo-fade-scale {
+  0% {
+    opacity: 0;
+    transform: scale(0.94);
+    filter: drop-shadow(0 0 0px transparent);
+  }
+  38% {
+    opacity: 1;
+    filter: drop-shadow(0 0 14px var(--pg-glow, rgba(0, 229, 255, 0.45)));
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+    filter: drop-shadow(0 0 0px transparent);
+  }
+}
+
+@keyframes parkgrid-ambient-bloom {
+  0% {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  38% {
+    opacity: 0.55;
+    transform: scale(1.06);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1);
+  }
+}
+
+.parkgrid-logo-root {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  user-select: none;
+  --pg-glow: rgba(0, 229, 255, 0.45);
+}
+
+/* Entrance animation applied during initial mount */
+.parkgrid-logo-root[data-animating="true"] .parkgrid-logo-inner {
+  animation: parkgrid-logo-fade-scale 0.85s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity, filter;
+}
+
+/* Gentle ambient cyan glow that blooms briefly and fades naturally */
+.parkgrid-logo-ambient-glow {
+  position: absolute;
+  inset: -15%;
+  border-radius: 9999px;
+  background: radial-gradient(
+    circle,
+    var(--pg-glow, rgba(0, 229, 255, 0.45)) 0%,
+    rgba(0, 242, 254, 0.12) 42%,
+    transparent 72%
+  );
+  pointer-events: none;
+  animation: parkgrid-ambient-bloom 0.85s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  filter: blur(8px);
+  will-change: transform, opacity;
+}
+
+/* Inner wrapper for image */
+.parkgrid-logo-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Base logo image */
+.parkgrid-logo-img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  user-select: none;
+  transition:
+    transform 0.28s cubic-bezier(0.16, 1, 0.3, 1),
+    filter 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform, filter;
+}
+
+/* Subtle, refined hover on interactive logos (not static) */
+.parkgrid-logo-interactive:hover .parkgrid-logo-img,
+.group:hover .parkgrid-logo-interactive .parkgrid-logo-img {
+  transform: scale(1.035);
+  filter: brightness(1.08) drop-shadow(0 2px 10px rgba(0, 229, 255, 0.2));
+}
+
+/* Active press micro-feedback */
+.parkgrid-logo-interactive:active .parkgrid-logo-img {
+  transform: scale(0.99);
+}
+
+/* Respect user's motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .parkgrid-logo-root[data-animating="true"] .parkgrid-logo-inner {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+    filter: none !important;
+  }
+  .parkgrid-logo-ambient-glow {
+    display: none !important;
+  }
+  .parkgrid-logo-img {
+    transition: none !important;
+  }
+  .parkgrid-logo-interactive:hover .parkgrid-logo-img,
+  .group:hover .parkgrid-logo-interactive .parkgrid-logo-img {
+    transform: none !important;
+    filter: none !important;
+  }
+}

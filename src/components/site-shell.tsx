@@ -26,6 +26,7 @@ import parkGridLogo from "@/assets/parkgrid-logo.png";
 import { AnimatedLogo } from "@/components/animated-logo";
 import { ThemeSelector } from "@/components/ThemeSelector";
 import { NavigationProgress } from "@/components/navigation-progress";
+import { RootSplash } from "@/components/root-splash";
 
 /** Lazy-loaded heavy effects — never parsed during the login phase */
 const OpeningAnimation = lazy(() =>
@@ -63,13 +64,20 @@ const supportLinks = [
   ["/support", "Contact Support"],
 ] as const;
 
-export function BrandMark({ compact = false }: { compact?: boolean }) {
+export function BrandMark({
+  compact = false,
+  variant = "small",
+}: {
+  compact?: boolean;
+  variant?: "small" | "large" | "static";
+}) {
   return (
     <span className="flex items-center gap-2.5">
       <span className="grid size-12 sm:size-14 shrink-0 place-items-center overflow-hidden rounded-lg border border-primary/30 bg-background shadow-[0_0_20px_var(--primary-glow)]">
         <AnimatedLogo
           src={parkGridLogo}
           alt="ParkGrid One"
+          preset={variant}
           className="size-full"
           imgClassName="object-cover"
         />
@@ -92,10 +100,17 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setAuthInitialized(true);
-    });
+    supabase.auth
+      .getSession()
+      .then(({ data: { session } }) => {
+        setSession(session);
+        setAuthInitialized(true);
+      })
+      .catch((err) => {
+        console.warn("Session check failed in SiteShell:", err);
+        setSession(null);
+        setAuthInitialized(true);
+      });
 
     const {
       data: { subscription },
@@ -139,7 +154,11 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
     };
   }, [session?.user?.id]);
   const isHomePage = path === "/";
-  const isAuthPage = path === "/login" || path.startsWith("/auth/");
+  const isAuthPage =
+    path === "/login" ||
+    path === "/signup" ||
+    path === "/forgot-password" ||
+    path.startsWith("/auth/");
 
   useEffect(() => {
     const listener = () => setScrolled(window.scrollY > 24);
@@ -166,7 +185,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
       sessionStorage.removeItem("parkgrid_authenticated");
       sessionStorage.removeItem("parkgrid_seen_intro");
       setSession(null);
-      navigate({ to: "/login" });
+      navigate({ to: "/login", replace: true });
     };
     window.addEventListener("parkgrid-logout", handleLogout);
     return () => window.removeEventListener("parkgrid-logout", handleLogout);
@@ -188,11 +207,12 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
 
     if (isProtected && !session) {
       if (path === "/") {
-        navigate({ to: "/login" });
+        navigate({ to: "/login", replace: true });
       } else {
         navigate({
           to: "/login",
           search: { redirect: path },
+          replace: true,
         });
       }
     }
@@ -204,6 +224,10 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
   const supportActive = supportLinks.some(([to]) => isActive(to));
 
   const isAdminRoute = path === "/admin" || path.startsWith("/admin/");
+
+  if (isHomePage && (!authInitialized || !session)) {
+    return <RootSplash />;
+  }
 
   if (isAuthPage || isAdminRoute) {
     return (
@@ -488,7 +512,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
           {/* ── Col 1: Brand ── */}
           <div className="flex flex-col gap-4">
             <Link to="/" aria-label="ParkGrid One home">
-              <BrandMark />
+              <BrandMark variant="static" />
             </Link>
             <p className="max-w-[240px] text-sm leading-6 text-muted-foreground">
               BKC Mumbai's premium connected parking facility — intelligent access, EV charging, and

@@ -25,11 +25,18 @@ import "./LoginPage.css";
 interface LoginPageProps {
   onLoginSuccess?: () => void;
   standalone?: boolean;
+  initialMode?: "signin" | "signup";
+  initialForgot?: boolean;
 }
 
-export function LoginPage({ onLoginSuccess, standalone = false }: LoginPageProps) {
+export function LoginPage({
+  onLoginSuccess,
+  standalone = false,
+  initialMode = "signin",
+  initialForgot = false,
+}: LoginPageProps) {
   const navigate = useNavigate();
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [mode, setMode] = useState<"signin" | "signup">(initialMode);
 
   // Form states
   const [email, setEmail] = useState("");
@@ -50,7 +57,7 @@ export function LoginPage({ onLoginSuccess, standalone = false }: LoginPageProps
   const [isExiting, setIsExiting] = useState(false);
 
   // Forgot password modal state
-  const [forgotModalOpen, setForgotModalOpen] = useState(false);
+  const [forgotModalOpen, setForgotModalOpen] = useState(initialForgot);
   const [forgotEmail, setForgotEmail] = useState("");
   const [forgotSent, setForgotSent] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -234,7 +241,12 @@ export function LoginPage({ onLoginSuccess, standalone = false }: LoginPageProps
         {/* Top Branding Header */}
         <div className="text-center mb-6">
           <div className="inline-flex items-center justify-center p-2 rounded-xl bg-background/60 border border-primary/40 shadow-[0_0_24px_rgba(0,242,254,0.2)] mb-3.5">
-            <AnimatedLogo src={parkGridLogo} alt="ParkGrid" className="size-10 object-contain" />
+            <AnimatedLogo
+              src={parkGridLogo}
+              alt="ParkGrid"
+              preset="large"
+              className="size-10 object-contain"
+            />
           </div>
 
           <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-primary flex items-center justify-center gap-1.5 mb-1.5">

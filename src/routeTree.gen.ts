@@ -18,12 +18,14 @@ import { Route as ConfirmationRouteImport } from './routes/confirmation'
 import { Route as EvChargingRouteImport } from './routes/ev-charging'
 import { Route as FacilitiesRouteImport } from './routes/facilities'
 import { Route as FaqRouteImport } from './routes/faq'
+import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as InformationRouteImport } from './routes/information'
 import { Route as LocationRouteImport } from './routes/location'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as NotificationsRouteImport } from './routes/notifications'
 import { Route as ParkingRouteImport } from './routes/parking'
 import { Route as ProfileRouteImport } from './routes/profile'
+import { Route as SignupRouteImport } from './routes/signup'
 import { Route as SupportRouteImport } from './routes/support'
 import { Route as VehiclesRouteImport } from './routes/vehicles'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
@@ -84,6 +86,11 @@ const FaqRoute = FaqRouteImport.update({
   path: '/faq',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
+  id: '/forgot-password',
+  path: '/forgot-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const InformationRoute = InformationRouteImport.update({
   id: '/information',
   path: '/information',
@@ -112,6 +119,11 @@ const ParkingRoute = ParkingRouteImport.update({
 const ProfileRoute = ProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SignupRoute = SignupRouteImport.update({
+  id: '/signup',
+  path: '/signup',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SupportRoute = SupportRouteImport.update({
@@ -195,12 +207,14 @@ export interface FileRoutesByFullPath {
   '/ev-charging': typeof EvChargingRoute
   '/facilities': typeof FacilitiesRoute
   '/faq': typeof FaqRoute
+  '/forgot-password': typeof ForgotPasswordRoute
   '/information': typeof InformationRoute
   '/location': typeof LocationRoute
   '/login': typeof LoginRoute
   '/notifications': typeof NotificationsRoute
   '/parking': typeof ParkingRoute
   '/profile': typeof ProfileRoute
+  '/signup': typeof SignupRoute
   '/support': typeof SupportRoute
   '/vehicles': typeof VehiclesRoute
   '/admin/bookings': typeof AdminBookingsRoute
@@ -225,12 +239,14 @@ export interface FileRoutesByTo {
   '/ev-charging': typeof EvChargingRoute
   '/facilities': typeof FacilitiesRoute
   '/faq': typeof FaqRoute
+  '/forgot-password': typeof ForgotPasswordRoute
   '/information': typeof InformationRoute
   '/location': typeof LocationRoute
   '/login': typeof LoginRoute
   '/notifications': typeof NotificationsRoute
   '/parking': typeof ParkingRoute
   '/profile': typeof ProfileRoute
+  '/signup': typeof SignupRoute
   '/support': typeof SupportRoute
   '/vehicles': typeof VehiclesRoute
   '/admin/bookings': typeof AdminBookingsRoute
@@ -257,12 +273,14 @@ export interface FileRoutesById {
   '/ev-charging': typeof EvChargingRoute
   '/facilities': typeof FacilitiesRoute
   '/faq': typeof FaqRoute
+  '/forgot-password': typeof ForgotPasswordRoute
   '/information': typeof InformationRoute
   '/location': typeof LocationRoute
   '/login': typeof LoginRoute
   '/notifications': typeof NotificationsRoute
   '/parking': typeof ParkingRoute
   '/profile': typeof ProfileRoute
+  '/signup': typeof SignupRoute
   '/support': typeof SupportRoute
   '/vehicles': typeof VehiclesRoute
   '/admin/bookings': typeof AdminBookingsRoute
@@ -290,12 +308,14 @@ export interface FileRouteTypes {
     | '/ev-charging'
     | '/facilities'
     | '/faq'
+    | '/forgot-password'
     | '/information'
     | '/location'
     | '/login'
     | '/notifications'
     | '/parking'
     | '/profile'
+    | '/signup'
     | '/support'
     | '/vehicles'
     | '/admin/bookings'
@@ -320,12 +340,14 @@ export interface FileRouteTypes {
     | '/ev-charging'
     | '/facilities'
     | '/faq'
+    | '/forgot-password'
     | '/information'
     | '/location'
     | '/login'
     | '/notifications'
     | '/parking'
     | '/profile'
+    | '/signup'
     | '/support'
     | '/vehicles'
     | '/admin/bookings'
@@ -351,12 +373,14 @@ export interface FileRouteTypes {
     | '/ev-charging'
     | '/facilities'
     | '/faq'
+    | '/forgot-password'
     | '/information'
     | '/location'
     | '/login'
     | '/notifications'
     | '/parking'
     | '/profile'
+    | '/signup'
     | '/support'
     | '/vehicles'
     | '/admin/bookings'
@@ -383,12 +407,14 @@ export interface RootRouteChildren {
   EvChargingRoute: typeof EvChargingRoute
   FacilitiesRoute: typeof FacilitiesRoute
   FaqRoute: typeof FaqRoute
+  ForgotPasswordRoute: typeof ForgotPasswordRoute
   InformationRoute: typeof InformationRoute
   LocationRoute: typeof LocationRoute
   LoginRoute: typeof LoginRoute
   NotificationsRoute: typeof NotificationsRoute
   ParkingRoute: typeof ParkingRoute
   ProfileRoute: typeof ProfileRoute
+  SignupRoute: typeof SignupRoute
   SupportRoute: typeof SupportRoute
   VehiclesRoute: typeof VehiclesRoute
   ApiChatRoute: typeof ApiChatRoute
@@ -460,6 +486,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FaqRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/forgot-password': {
+      id: '/forgot-password'
+      path: '/forgot-password'
+      fullPath: '/forgot-password'
+      preLoaderRoute: typeof ForgotPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/information': {
       id: '/information'
       path: '/information'
@@ -500,6 +533,13 @@ declare module '@tanstack/react-router' {
       path: '/profile'
       fullPath: '/profile'
       preLoaderRoute: typeof ProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/signup': {
+      id: '/signup'
+      path: '/signup'
+      fullPath: '/signup'
+      preLoaderRoute: typeof SignupRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/support': {
@@ -641,12 +681,14 @@ const rootRouteChildren: RootRouteChildren = {
   EvChargingRoute: EvChargingRoute,
   FacilitiesRoute: FacilitiesRoute,
   FaqRoute: FaqRoute,
+  ForgotPasswordRoute: ForgotPasswordRoute,
   InformationRoute: InformationRoute,
   LocationRoute: LocationRoute,
   LoginRoute: LoginRoute,
   NotificationsRoute: NotificationsRoute,
   ParkingRoute: ParkingRoute,
   ProfileRoute: ProfileRoute,
+  SignupRoute: SignupRoute,
   SupportRoute: SupportRoute,
   VehiclesRoute: VehiclesRoute,
   ApiChatRoute: ApiChatRoute,

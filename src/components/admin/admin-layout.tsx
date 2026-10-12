@@ -24,6 +24,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import parkGridLogo from "@/assets/parkgrid-logo.png";
+import { AnimatedLogo } from "@/components/animated-logo";
 
 interface NavItem {
   to: string;
@@ -210,6 +212,38 @@ export function AdminLayout({ children }: { children?: React.ReactNode }) {
             collapsed ? "w-16" : "w-60",
           )}
         >
+          <div
+            className={cn(
+              "p-3 border-b border-border/60 flex items-center h-14",
+              collapsed ? "justify-center" : "gap-2.5",
+            )}
+          >
+            <Link
+              to="/"
+              title={collapsed ? "ParkGrid Console" : undefined}
+              className="flex items-center gap-2.5 overflow-hidden group focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary rounded-md"
+            >
+              <div className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-lg border border-primary/30 bg-background shadow-[0_0_12px_var(--primary-glow)]">
+                <AnimatedLogo
+                  src={parkGridLogo}
+                  alt="ParkGrid"
+                  preset="small"
+                  className="size-full"
+                  imgClassName="object-cover"
+                />
+              </div>
+              {!collapsed && (
+                <div className="leading-tight truncate">
+                  <span className="block font-display text-xs font-semibold tracking-wider text-foreground">
+                    PARKGRID
+                  </span>
+                  <span className="font-mono text-[8px] uppercase tracking-wider text-muted-foreground">
+                    Console
+                  </span>
+                </div>
+              )}
+            </Link>
+          </div>
           <nav
             className="flex-1 p-3 space-y-6 overflow-y-auto"
             aria-label="Admin desktop navigation"
@@ -278,7 +312,18 @@ export function AdminLayout({ children }: { children?: React.ReactNode }) {
             >
               <div>
                 <div className="flex items-center justify-between pb-3 border-b border-border mb-4">
-                  <span className="font-display font-semibold text-sm">Navigation</span>
+                  <div className="flex items-center gap-2">
+                    <div className="grid size-7 shrink-0 place-items-center overflow-hidden rounded-md border border-primary/30 bg-background">
+                      <AnimatedLogo
+                        src={parkGridLogo}
+                        alt="ParkGrid"
+                        preset="static"
+                        className="size-full"
+                        imgClassName="object-cover"
+                      />
+                    </div>
+                    <span className="font-display font-semibold text-sm">Navigation</span>
+                  </div>
                   <Button
                     size="icon"
                     variant="ghost"

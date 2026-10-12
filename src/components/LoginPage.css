@@ -93,7 +93,7 @@
     0 0 40px rgba(0, 242, 254, 0.08),
     inset 0 1px 0 rgba(255, 255, 255, 0.1);
   border-radius: 14px;
-  animation: loginCardFadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: loginCardFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 @keyframes loginCardFadeIn {
@@ -104,6 +104,13 @@
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-glass-card {
+    animation: none !important;
+    transform: none !important;
   }
 }
 
