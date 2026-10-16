@@ -14,8 +14,8 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { ParkingSlotData } from "@/lib/parking-data";
-import { FLOOR_CONFIG } from "@/lib/parking-data";
+import type { ParkingSlotData, LevelCode } from "@/lib/parking-data";
+import { LEVEL_CONFIG } from "@/lib/parking-data";
 import { useReducedMotion, useVisible } from "./effects/useParkingMotion";
 import { MapEffects } from "./effects/ParkingEffects";
 
@@ -23,16 +23,17 @@ interface Props {
   slots: ParkingSlotData[];
   selectedSlot: ParkingSlotData | null;
   onSelectSlot: (slot: ParkingSlotData) => void;
-  activeFloor: number;
+  activeFloor: LevelCode | string | number;
   pulsing?: string | null;
 }
 const INITIAL = { x: 35, y: -10 };
-const COLORS = {
+const COLORS: Record<string, string> = {
   available: "var(--available)",
   occupied: "var(--destructive)",
   reserved: "var(--reserved)",
   selected: "var(--selected)",
   maintenance: "var(--muted-foreground)",
+  blocked: "var(--muted-foreground)",
 };
 
 export default function ParkingGrid3D({
@@ -98,8 +99,11 @@ export default function ParkingGrid3D({
     <div ref={ref} className="pg3d">
       <div className="pg3d-toolbar">
         <p className="text-xs text-muted-foreground">
-          Floor {FLOOR_CONFIG[activeFloor]?.label ?? activeFloor} ·{" "}
-          {slots.filter((slot) => slot.status === "available").length} available in view
+          Level{" "}
+          {typeof activeFloor === "string" && activeFloor in LEVEL_CONFIG
+            ? LEVEL_CONFIG[activeFloor as LevelCode].label
+            : activeFloor}{" "}
+          · {slots.filter((slot) => slot.status === "available").length} available in view
         </p>
         <div className="flex flex-wrap gap-1" role="group" aria-label="Parking map view controls">
           <Button
@@ -193,7 +197,7 @@ export default function ParkingGrid3D({
               <div
                 key={slot.id}
                 className="pg3d-position"
-                style={{ left: 24 + slot.col * 96, top: 24 + slot.row * 112 }}
+                style={{ left: 24 + (index % 4) * 96, top: 24 + Math.floor(index / 4) * 112 }}
               >
                 <motion.button
                   type="button"

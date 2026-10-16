@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import {
   CalendarCheck,
@@ -17,7 +17,8 @@ import {
 } from "lucide-react";
 import { requireAdminGuard } from "@/lib/auth-guard";
 import { DemoBadge } from "@/components/admin/demo-badge";
-import { ADMIN_BOOKINGS, type AdminBooking } from "@/mocks/admin";
+import { useAdminBookings, type AdminBookingRow } from "@/hooks/useBookings";
+import { formatIstDateTime, formatPaise } from "@/lib/date-utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -56,39 +57,23 @@ export const Route = createFileRoute("/admin/bookings")({
 function AdminBookingsPage() {
   const [statusFilter, setStatusFilter] = useState<string>("All");
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const [selectedBooking, setSelectedBooking] = useState<AdminBooking | null>(null);
+  const [selectedBooking, setSelectedBooking] = useState<AdminBookingRow | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const [loading, setLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const filteredBookings = useMemo(() => {
-    return ADMIN_BOOKINGS.filter((b) => {
-      if (statusFilter !== "All" && b.status !== statusFilter) return false;
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase().trim();
-        const matchRef = b.reference.toLowerCase().includes(q);
-        const matchName = b.guestName.toLowerCase().includes(q);
-        const matchPlate = b.vehiclePlate.toLowerCase().includes(q);
-        const matchBay = b.slotCode.toLowerCase().includes(q);
-        if (!matchRef && !matchName && !matchPlate && !matchBay) return false;
-      }
-      return true;
-    });
-  }, [statusFilter, searchQuery]);
+  const { data, isLoading, isError, error, refetch, isFetching } = useAdminBookings({
+    status: statusFilter === "All" ? undefined : statusFilter.toLowerCase(),
+    search: searchQuery.trim() || undefined,
+    page,
+    pageSize,
+  });
 
-  const totalPages = Math.ceil(filteredBookings.length / pageSize) || 1;
-  const paginatedBookings = useMemo(() => {
-    const from = (page - 1) * pageSize;
-    return filteredBookings.slice(from, from + pageSize);
-  }, [filteredBookings, page, pageSize]);
+  const bookings = data?.bookings ?? [];
+  const total = data?.totalCount ?? 0;
+  const totalPages = data?.totalPages ?? (Math.ceil(total / pageSize) || 1);
 
   const handleRefresh = () => {
-    setLoading(true);
-    setErrorMsg(null);
-    setTimeout(() => {
-      setLoading(false);
-    }, 250);
+    refetch();
   };
 
   return (
@@ -112,25 +97,16 @@ function AdminBookingsPage() {
             size="sm"
             variant="outline"
             onClick={handleRefresh}
-            disabled={loading}
+            disabled={isFetching}
             className="h-8 text-xs gap-1.5"
           >
-            <RefreshCw className={`size-3.5 ${loading ? "animate-spin" : ""}`} />
+            <RefreshCw className={`size-3.5 ${isFetching ? "animate-spin" : ""}`} />
             Refresh
           </Button>
 
           <div className="hidden sm:flex items-center gap-2 text-xs font-mono text-muted-foreground">
             <span className="rounded-md border border-border bg-surface px-2.5 py-1">
-              Active:{" "}
-              <strong className="text-foreground tabular-nums">
-                {ADMIN_BOOKINGS.filter((b) => b.status === "active").length}
-              </strong>
-            </span>
-            <span className="rounded-md border border-border bg-surface px-2.5 py-1">
-              Confirmed:{" "}
-              <strong className="text-foreground tabular-nums">
-                {ADMIN_BOOKINGS.filter((b) => b.status === "confirmed").length}
-              </strong>
+              Total reservations: <strong className="text-foreground tabular-nums">{total}</strong>
             </span>
           </div>
         </div>
@@ -146,14 +122,14 @@ function AdminBookingsPage() {
               setSearchQuery(e.target.value);
               setPage(1);
             }}
-            placeholder="Search booking ref, name, vehicle plate, or bay..."
+            placeholder="Search booking ref, plate, or slot..."
             className="h-8 pl-8 text-xs bg-background"
           />
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
           <div className="flex items-center gap-1 overflow-x-auto">
-            {["All", "active", "confirmed", "completed", "cancelled"].map((st) => (
+            {["All", "active", "confirmed", "reserved", "completed", "cancelled"].map((st) => (
               <button
                 key={st}
                 onClick={() => {
@@ -186,12 +162,14 @@ function AdminBookingsPage() {
         </div>
       </div>
 
-      {/* ── Bookings Table (horizontal scroll container) ── */}
+      {/* ── Bookings Table ── */}
       <div className="rounded-xl border border-border bg-surface overflow-hidden shadow-sm">
-        {errorMsg ? (
+        {isError ? (
           <div className="p-8 text-center text-xs">
             <AlertCircle className="size-8 mx-auto mb-2 text-destructive" />
-            <p className="text-foreground font-semibold">{errorMsg}</p>
+            <p className="text-foreground font-semibold">
+              {error instanceof Error ? error.message : "Failed to load bookings"}
+            </p>
             <Button size="sm" variant="outline" onClick={handleRefresh} className="mt-4 text-xs">
               Try again
             </Button>
@@ -226,7 +204,7 @@ function AdminBookingsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {loading ? (
+                {isLoading ? (
                   Array.from({ length: 5 }).map((_, i) => (
                     <TableRow key={i} className="border-border/60">
                       <TableCell colSpan={8} className="py-3.5">
@@ -234,7 +212,7 @@ function AdminBookingsPage() {
                       </TableCell>
                     </TableRow>
                   ))
-                ) : paginatedBookings.length === 0 ? (
+                ) : bookings.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={8} className="h-36 text-center text-muted-foreground">
                       <div className="flex flex-col items-center justify-center gap-1.5 py-6">
@@ -244,21 +222,23 @@ function AdminBookingsPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  paginatedBookings.map((b) => (
+                  bookings.map((b) => (
                     <TableRow key={b.id} className="border-border/60 text-xs hover:bg-accent/40">
                       <TableCell className="font-mono font-bold text-foreground">
                         {b.reference}
                       </TableCell>
-                      <TableCell className="font-medium text-foreground">{b.guestName}</TableCell>
+                      <TableCell className="font-medium text-foreground">
+                        {b.profiles?.full_name || "Customer"}
+                      </TableCell>
                       <TableCell className="font-mono text-muted-foreground">
-                        {b.vehiclePlate}
+                        {b.plate_snapshot || b.vehicles?.plate_number || "—"}
                       </TableCell>
                       <TableCell>
                         <span className="font-mono font-semibold text-foreground">
-                          Bay {b.slotCode}
+                          Bay {b.parking_slots?.code || "—"}
                         </span>
                         <span className="text-muted-foreground ml-1.5 font-mono text-[11px]">
-                          (Lvl {b.level})
+                          (Lvl {b.parking_slots?.level_code || "—"})
                         </span>
                       </TableCell>
                       <TableCell>
@@ -271,7 +251,9 @@ function AdminBookingsPage() {
                                 ? "border-cyan-500/40 text-cyan-400 bg-cyan-500/10"
                                 : b.status === "completed"
                                   ? "border-border/60 text-muted-foreground bg-muted/40"
-                                  : "border-destructive/40 text-destructive bg-destructive/10"
+                                  : b.status === "reserved"
+                                    ? "border-amber-500/40 text-amber-400 bg-amber-500/10"
+                                    : "border-destructive/40 text-destructive bg-destructive/10"
                           }`}
                         >
                           {b.status}
@@ -279,11 +261,11 @@ function AdminBookingsPage() {
                       </TableCell>
                       <TableCell>
                         <span className="font-mono text-[11px] text-muted-foreground capitalize">
-                          {b.paymentStatus}
+                          {b.payment_status}
                         </span>
                       </TableCell>
                       <TableCell className="font-mono font-bold text-right text-foreground tabular-nums">
-                        ₹{b.amount}
+                        {formatPaise(b.total_paise)}
                       </TableCell>
                       <TableCell className="text-right">
                         <Button
@@ -307,10 +289,8 @@ function AdminBookingsPage() {
         {/* Consistent Pagination Footer */}
         <div className="border-t border-border/60 px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted-foreground font-mono">
           <div>
-            Showing{" "}
-            <strong className="text-foreground tabular-nums">{paginatedBookings.length}</strong> of{" "}
-            <strong className="text-foreground tabular-nums">{filteredBookings.length}</strong>{" "}
-            bookings
+            Showing <strong className="text-foreground tabular-nums">{bookings.length}</strong> of{" "}
+            <strong className="text-foreground tabular-nums">{total}</strong> bookings
           </div>
 
           <div className="flex items-center gap-2">
@@ -321,7 +301,7 @@ function AdminBookingsPage() {
               variant="outline"
               size="icon"
               className="size-7"
-              disabled={page <= 1 || loading}
+              disabled={page <= 1 || isLoading}
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               aria-label="Previous page"
             >
@@ -331,7 +311,7 @@ function AdminBookingsPage() {
               variant="outline"
               size="icon"
               className="size-7"
-              disabled={page >= totalPages || loading}
+              disabled={page >= totalPages || isLoading}
               onClick={() => setPage((p) => p + 1)}
               aria-label="Next page"
             >
@@ -367,36 +347,48 @@ function AdminBookingsPage() {
                     Guest & Vehicle
                   </span>
                   <div className="flex justify-between items-center">
-                    <span className="text-muted-foreground">Guest Name:</span>
-                    <strong className="text-foreground">{selectedBooking.guestName}</strong>
+                    <span className="text-muted-foreground">Guest:</span>
+                    <strong className="text-foreground">
+                      {selectedBooking.profiles?.full_name || "Customer"}
+                    </strong>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-muted-foreground">Vehicle Plate:</span>
                     <strong className="font-mono text-foreground">
-                      {selectedBooking.vehiclePlate}
+                      {selectedBooking.plate_snapshot ||
+                        selectedBooking.vehicles?.plate_number ||
+                        "—"}
                     </strong>
                   </div>
-                  {selectedBooking.notes && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground">Notes:</span>
-                      <span className="text-foreground">{selectedBooking.notes}</span>
-                    </div>
-                  )}
                 </div>
 
                 <div className="rounded-lg border border-border bg-background p-4 space-y-3">
                   <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground block">
-                    Bay Allocation
+                    Bay Allocation & Time
                   </span>
                   <div className="flex justify-between items-center">
                     <span className="text-muted-foreground">Assigned Bay:</span>
                     <span className="font-mono font-bold text-foreground">
-                      Bay {selectedBooking.slotCode}
+                      Bay {selectedBooking.parking_slots?.code || "—"}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-muted-foreground">Floor Level:</span>
-                    <span className="text-foreground">Level {selectedBooking.level}</span>
+                    <span className="text-foreground">
+                      Level {selectedBooking.parking_slots?.level_code || "—"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Start:</span>
+                    <span className="font-mono text-foreground">
+                      {formatIstDateTime(selectedBooking.start_at)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">End:</span>
+                    <span className="font-mono text-foreground">
+                      {formatIstDateTime(selectedBooking.end_at)}
+                    </span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-muted-foreground">Status:</span>
@@ -407,7 +399,9 @@ function AdminBookingsPage() {
                           ? "border-emerald-500/40 text-emerald-400 bg-emerald-500/10"
                           : selectedBooking.status === "confirmed"
                             ? "border-cyan-500/40 text-cyan-400 bg-cyan-500/10"
-                            : "border-border/60 text-muted-foreground bg-muted/40"
+                            : selectedBooking.status === "reserved"
+                              ? "border-amber-500/40 text-amber-400 bg-amber-500/10"
+                              : "border-border/60 text-muted-foreground bg-muted/40"
                       }`}
                     >
                       {selectedBooking.status}
@@ -420,17 +414,37 @@ function AdminBookingsPage() {
                     Financials
                   </span>
                   <div className="flex justify-between items-center">
-                    <span className="text-muted-foreground">Total Fee:</span>
+                    <span className="text-muted-foreground">Base Fee:</span>
+                    <span className="font-mono text-foreground">
+                      {formatPaise(selectedBooking.base_paise)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">GST (18%):</span>
+                    <span className="font-mono text-foreground">
+                      {formatPaise(selectedBooking.gst_paise)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center border-t border-border/60 pt-2">
+                    <span className="font-medium text-foreground">Total Fee:</span>
                     <strong className="font-mono text-foreground text-sm tabular-nums">
-                      ₹{selectedBooking.amount}
+                      {formatPaise(selectedBooking.total_paise)}
                     </strong>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-muted-foreground">Payment Status:</span>
                     <span className="capitalize text-foreground font-mono">
-                      {selectedBooking.paymentStatus}
+                      {selectedBooking.payment_status}
                     </span>
                   </div>
+                  {selectedBooking.refund_paise > 0 && (
+                    <div className="flex justify-between items-center text-emerald-500">
+                      <span className="font-medium">Refund Processed:</span>
+                      <strong className="font-mono">
+                        {formatPaise(selectedBooking.refund_paise)}
+                      </strong>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

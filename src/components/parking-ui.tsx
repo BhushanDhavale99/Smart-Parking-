@@ -1,4 +1,4 @@
-import { lazy, Suspense, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useState, useCallback } from "react";
 const ParkingGrid3D = lazy(() => import("./ParkingGrid3D"));
 import {
   CarFront,
@@ -10,6 +10,8 @@ import {
   Check,
   CircleSlash2,
   TriangleAlert,
+  RefreshCw,
+  AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -17,8 +19,11 @@ import {
   parkingSlots,
   type ParkingSlotData,
   type SlotStatus,
+  type LevelCode,
+  LEVEL_CONFIG,
   FLOOR_CONFIG,
 } from "@/lib/parking-data";
+import { listSlots, type ParkingSlotRow } from "@/lib/parking.server";
 
 const statusClasses: Record<SlotStatus, string> = {
   available: "border-available/50 bg-available/10 text-available",
@@ -26,28 +31,41 @@ const statusClasses: Record<SlotStatus, string> = {
   reserved: "border-reserved/50 bg-reserved/10 text-reserved",
   selected: "border-selected bg-selected/20 text-selected shadow-[0_0_24px_var(--selected-glow)]",
   maintenance: "border-muted-foreground/40 bg-muted text-muted-foreground",
+  blocked: "border-muted-foreground/40 bg-muted text-muted-foreground",
 };
 
 export function StatusBadge({
   status,
 }: {
-  status: SlotStatus | "active" | "completed" | "cancelled";
+  status:
+    | SlotStatus
+    | "active"
+    | "completed"
+    | "cancelled"
+    | "confirmed"
+    | "no_show"
+    | "expired"
+    | string;
 }) {
   const tones: Record<string, string> = {
     available: "bg-available/12 text-available",
     occupied: "bg-occupied/12 text-occupied",
     reserved: "bg-reserved/12 text-reserved",
+    confirmed: "bg-available/12 text-available",
     selected: "bg-selected/12 text-selected",
     active: "bg-selected/12 text-selected",
     completed: "bg-muted text-muted-foreground",
     cancelled: "bg-occupied/12 text-occupied",
+    no_show: "bg-occupied/12 text-occupied",
+    expired: "bg-muted text-muted-foreground",
     maintenance: "bg-muted text-muted-foreground",
+    blocked: "bg-muted text-muted-foreground",
   };
   return (
     <span
       className={cn(
         "inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase",
-        tones[status],
+        tones[status] ?? "bg-muted text-muted-foreground",
       )}
     >
       {status}
@@ -92,7 +110,7 @@ export function ParkingSlot({
       className={cn(
         "group relative flex min-h-20 flex-col justify-between overflow-hidden border p-2.5 text-left transition duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-75",
         compact ? "min-h-16" : "sm:min-h-24",
-        statusClasses[displayStatus],
+        statusClasses[displayStatus] ?? statusClasses.available,
         !disabled && "hover:-translate-y-1 hover:scale-[1.02]",
       )}
     >
@@ -117,26 +135,118 @@ export function ParkingSlot({
   );
 }
 
+const ORDERED_LEVELS: LevelCode[] = ["B2", "B1", "G1", "L1", "L2"];
+
 export function ParkingMap({
   preview = false,
   onSelection,
+  onSlotsLoaded,
+  availabilityMap,
+  level: externalLevel,
+  onLevelChange,
 }: {
   preview?: boolean;
   onSelection?: (slot: ParkingSlotData) => void;
+  onSlotsLoaded?: (slots: ParkingSlotData[]) => void;
+  availabilityMap?: Record<string, boolean>;
+  level?: LevelCode;
+  onLevelChange?: (level: LevelCode) => void;
 }) {
-  const [floor, setFloor] = useState(1);
+  const [internalLevel, setInternalLevel] = useState<LevelCode>(externalLevel ?? "G1");
+  const level = externalLevel ?? internalLevel;
+  const setLevel = (newLevel: LevelCode) => {
+    setInternalLevel(newLevel);
+    onLevelChange?.(newLevel);
+  };
   const [zone, setZone] = useState<"All" | "A" | "B" | "EV">("All");
   const [selected, setSelected] = useState<ParkingSlotData | null>(null);
-  const slots = useMemo(
-    () =>
-      parkingSlots
-        .filter((slot) => slot.floor === floor && (zone === "All" || slot.zone === zone))
-        .slice(0, preview ? 10 : 12),
-    [floor, preview, zone],
-  );
+  const [slots, setSlots] = useState<ParkingSlotData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [announcement, setAnnouncement] = useState("");
   const [pulsing, setPulsing] = useState<string | null>(null);
+
+  const fetchSlots = useCallback(async () => {
+    setLoading(true);
+    setErrorMsg(null);
+    try {
+      const res = await listSlots({
+        data: {
+          level,
+          zone,
+          pageSize: 0,
+        },
+      });
+
+      const mapped: ParkingSlotData[] = (res.slots as unknown as ParkingSlotRow[]).map(
+        (slot, index) => {
+          const isEv = slot.slot_type === "ev";
+          const isAccessible = slot.slot_type === "accessible";
+          const displayType: "Car" | "Bike" | "EV" | "Accessible" = isEv
+            ? "EV"
+            : isAccessible
+              ? "Accessible"
+              : "Car";
+          const isSlotAvailable = availabilityMap
+            ? (availabilityMap[slot.id] ?? availabilityMap[slot.code] ?? true)
+            : true;
+          const status: SlotStatus =
+            slot.admin_status !== "active"
+              ? "maintenance"
+              : !isSlotAvailable
+                ? "occupied"
+                : "available";
+
+          return {
+            id: slot.code,
+            code: slot.code,
+            slotId: slot.id,
+            levelCode: slot.level_code as LevelCode,
+            floor: LEVEL_CONFIG[slot.level_code as LevelCode]?.sortOrder ?? 3,
+            row: Math.floor(index / 4),
+            col: index % 4,
+            zone: slot.zone as "A" | "B" | "EV",
+            status,
+            type: displayType,
+            slotType: slot.slot_type as "standard" | "ev" | "accessible",
+            price: Math.round(slot.hourly_rate_paise / 100),
+            hourlyRatePaise: slot.hourly_rate_paise,
+            hasEvCharger: slot.has_ev_charger,
+            adminStatus: slot.admin_status as "active" | "maintenance" | "blocked",
+            notes: slot.notes,
+          };
+        },
+      );
+      setSlots(mapped);
+      onSlotsLoaded?.(mapped);
+    } catch {
+      // Graceful fallback to seeded canonical slots if not logged in
+      const fallback = parkingSlots
+        .filter((slot) => slot.levelCode === level && (zone === "All" || slot.zone === zone))
+        .map((slot) => {
+          const isSlotAvailable = availabilityMap
+            ? (availabilityMap[slot.slotId ?? ""] ?? availabilityMap[slot.id] ?? true)
+            : true;
+          return {
+            ...slot,
+            status: !isSlotAvailable ? ("occupied" as SlotStatus) : slot.status,
+          };
+        });
+      setSlots(fallback);
+      onSlotsLoaded?.(fallback);
+    } finally {
+      setLoading(false);
+    }
+  }, [level, zone, availabilityMap, onSlotsLoaded]);
+
+  useEffect(() => {
+    fetchSlots();
+  }, [fetchSlots]);
+
+  const visibleSlots = preview ? slots.slice(0, 10) : slots.slice(0, 12);
+
   const choose = (slot: ParkingSlotData) => {
+    if (slot.status !== "available") return;
     // Pulse the slot with accent glow before updating selection
     setPulsing(slot.id);
     setTimeout(() => {
@@ -146,31 +256,31 @@ export function ParkingMap({
       setPulsing(null);
     }, 300);
   };
+
   return (
     <div className="parking-grid overflow-hidden border border-border bg-surface p-4 sm:p-6">
       {!preview && (
         <div className="mb-5 flex flex-col gap-3">
           {/* ── Floor selector ── */}
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap gap-1" role="tablist" aria-label="Parking floor">
-              {(Object.keys(FLOOR_CONFIG) as unknown as number[]).map((id) => {
-                const floorId = Number(id);
-                const { label, category } = FLOOR_CONFIG[floorId]!;
+            <div className="flex flex-wrap gap-1" role="tablist" aria-label="Parking level">
+              {ORDERED_LEVELS.map((code) => {
+                const conf = LEVEL_CONFIG[code];
                 return (
                   <Button
-                    key={floorId}
+                    key={code}
                     size="sm"
                     role="tab"
-                    aria-selected={floor === floorId}
-                    variant={floor === floorId ? "default" : "ghost"}
-                    onClick={() => setFloor(floorId)}
+                    aria-selected={level === code}
+                    variant={level === code ? "default" : "ghost"}
+                    onClick={() => setLevel(code)}
                     className="font-mono"
                   >
-                    <span>{label}</span>
+                    <span>{conf.label}</span>
                     <span className="ml-1.5 hidden text-[9px] font-normal capitalize opacity-60 sm:inline">
-                      {category === "basement"
+                      {conf.category === "basement"
                         ? "↓ Underground"
-                        : category === "ground"
+                        : conf.category === "ground"
                           ? "Ground"
                           : "↑ Upper"}
                     </span>
@@ -215,23 +325,45 @@ export function ParkingMap({
         </span>
         <span>Exit</span>
       </div>
-      <Suspense
-        fallback={
-          <div className="flex min-h-[320px] flex-col items-center justify-center gap-2 rounded-lg border border-border/40 bg-surface/60 font-mono text-xs text-muted-foreground">
-            <span className="live-dot" />
-            <span>Loading 3D Parking Grid...</span>
-          </div>
-        }
-      >
-        <ParkingGrid3D
-          key={`${floor}-${zone}`}
-          slots={slots}
-          selectedSlot={selected}
-          onSelectSlot={choose}
-          activeFloor={floor}
-          pulsing={pulsing}
-        />
-      </Suspense>
+
+      {loading ? (
+        <div className="flex min-h-[320px] flex-col items-center justify-center gap-2 rounded-lg border border-border/40 bg-surface/60 font-mono text-xs text-muted-foreground">
+          <span className="live-dot" />
+          <span>Loading live parking grid...</span>
+        </div>
+      ) : errorMsg ? (
+        <div className="flex min-h-[320px] flex-col items-center justify-center gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-6 text-center text-xs">
+          <AlertCircle className="size-6 text-destructive" />
+          <p className="font-medium text-foreground">{errorMsg}</p>
+          <Button size="sm" variant="outline" onClick={fetchSlots} className="gap-1.5 text-xs">
+            <RefreshCw className="size-3" /> Retry
+          </Button>
+        </div>
+      ) : visibleSlots.length === 0 ? (
+        <div className="flex min-h-[320px] flex-col items-center justify-center gap-2 rounded-lg border border-border/40 bg-surface/40 p-6 text-center text-xs text-muted-foreground">
+          <CircleSlash2 className="size-6 opacity-40" />
+          <p>No parking bays found for this filter.</p>
+        </div>
+      ) : (
+        <Suspense
+          fallback={
+            <div className="flex min-h-[320px] flex-col items-center justify-center gap-2 rounded-lg border border-border/40 bg-surface/60 font-mono text-xs text-muted-foreground">
+              <span className="live-dot" />
+              <span>Rendering 3D Parking Grid...</span>
+            </div>
+          }
+        >
+          <ParkingGrid3D
+            key={`${level}-${zone}`}
+            slots={visibleSlots}
+            selectedSlot={selected}
+            onSelectSlot={choose}
+            activeFloor={level}
+            pulsing={pulsing}
+          />
+        </Suspense>
+      )}
+
       <p className="sr-only" aria-live="polite">
         {announcement}
       </p>
@@ -240,24 +372,29 @@ export function ParkingMap({
         <span className="font-mono text-[10px] uppercase tracking-widest">Drive lane · 8 km/h</span>
         <ArrowDown className="size-4 rotate-90" />
       </div>
-      <div className="flex flex-wrap gap-x-4 gap-y-2 text-[11px] text-muted-foreground">
-        {["available", "occupied", "reserved", "selected"].map((item) => (
-          <span key={item} className="flex items-center gap-1.5 capitalize">
-            <i
-              className={cn(
-                "size-2 rounded-full",
-                item === "available"
-                  ? "bg-available"
-                  : item === "occupied"
-                    ? "bg-occupied"
-                    : item === "reserved"
-                      ? "bg-reserved"
+      <div className="flex flex-wrap items-center justify-between gap-y-2 text-[11px] text-muted-foreground">
+        <div className="flex flex-wrap gap-x-4 gap-y-2">
+          {(["available", "maintenance", "selected"] as const).map((item) => (
+            <span key={item} className="flex items-center gap-1.5 capitalize">
+              <i
+                className={cn(
+                  "size-2 rounded-full",
+                  item === "available"
+                    ? "bg-available"
+                    : item === "maintenance"
+                      ? "bg-muted-foreground"
                       : "bg-selected",
-              )}
-            />
-            {item}
-          </span>
-        ))}
+                )}
+              />
+              {item}
+            </span>
+          ))}
+        </div>
+        <span className="text-[10px] font-mono text-muted-foreground">
+          {availabilityMap
+            ? "Live availability based on selected time window"
+            : "Live occupancy arrives with bookings"}
+        </span>
       </div>
     </div>
   );

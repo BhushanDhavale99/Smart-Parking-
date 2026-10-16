@@ -1,24 +1,29 @@
-import { useState, useMemo } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
-  Grid3X3,
   Search,
   ArrowUpRight,
   Zap,
   CarFront,
-  Sparkles,
   ChevronLeft,
   ChevronRight,
   RefreshCw,
   AlertCircle,
   Inbox,
+  Settings2,
 } from "lucide-react";
 import { requireAdminGuard } from "@/lib/auth-guard";
-import { DemoBadge } from "@/components/admin/demo-badge";
-import { ADMIN_SLOTS, type AdminSlot } from "@/mocks/admin";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Table,
   TableBody,
@@ -27,6 +32,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { listSlots, adminUpdateSlot, type ParkingSlotRow } from "@/lib/parking.server";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin/slots")({
   beforeLoad: async ({ location }) => {
@@ -44,43 +51,90 @@ export const Route = createFileRoute("/admin/slots")({
   component: AdminSlotsPage,
 });
 
-function AdminSlotsPage() {
+export function AdminSlotsPage() {
   const [levelFilter, setLevelFilter] = useState<string>("All");
   const [statusFilter, setStatusFilter] = useState<string>("All");
   const [typeFilter, setTypeFilter] = useState<string>("All");
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [debouncedSearch, setDebouncedSearch] = useState<string>("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(15);
-  const [loading, setLoading] = useState(false);
+  const [slots, setSlots] = useState<ParkingSlotRow[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const filteredSlots = useMemo(() => {
-    return ADMIN_SLOTS.filter((slot) => {
-      if (levelFilter !== "All" && slot.level !== levelFilter) return false;
-      if (statusFilter !== "All" && slot.status !== statusFilter) return false;
-      if (typeFilter !== "All" && slot.type !== typeFilter) return false;
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase().trim();
-        const matchCode = slot.code.toLowerCase().includes(q);
-        const matchPlate = slot.currentVehiclePlate?.toLowerCase().includes(q) ?? false;
-        if (!matchCode && !matchPlate) return false;
-      }
-      return true;
-    });
-  }, [levelFilter, statusFilter, typeFilter, searchQuery]);
+  // Status Change Dialog State
+  const [editingSlot, setEditingSlot] = useState<ParkingSlotRow | null>(null);
+  const [targetStatus, setTargetStatus] = useState<"active" | "maintenance" | "blocked">("active");
+  const [targetNotes, setTargetNotes] = useState<string>("");
+  const [isUpdating, setIsUpdating] = useState(false);
 
-  const totalPages = Math.ceil(filteredSlots.length / pageSize) || 1;
-  const paginatedSlots = useMemo(() => {
-    const from = (page - 1) * pageSize;
-    return filteredSlots.slice(from, from + pageSize);
-  }, [filteredSlots, page, pageSize]);
+  // Debounce search input
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
 
-  const handleRefresh = () => {
+  const loadSlots = useCallback(async () => {
     setLoading(true);
     setErrorMsg(null);
-    setTimeout(() => {
+    try {
+      const res = await listSlots({
+        data: {
+          level: levelFilter as "All" | "B2" | "B1" | "G1" | "L1" | "L2",
+          slot_type: typeFilter as "All" | "standard" | "ev" | "accessible",
+          admin_status: statusFilter as "All" | "active" | "maintenance" | "blocked",
+          search: debouncedSearch,
+          page,
+          pageSize,
+        },
+      });
+      setSlots(res.slots as unknown as ParkingSlotRow[]);
+      setTotalCount(res.totalCount);
+      setTotalPages(res.totalPages);
+    } catch (err: unknown) {
+      console.error("[AdminSlotsPage] Error fetching slots:", err);
+      setErrorMsg("Failed to load parking slots. Please check your database connection or retry.");
+    } finally {
       setLoading(false);
-    }, 250);
+    }
+  }, [levelFilter, typeFilter, statusFilter, debouncedSearch, page, pageSize]);
+
+  useEffect(() => {
+    loadSlots();
+  }, [loadSlots]);
+
+  const openStatusDialog = (slot: ParkingSlotRow) => {
+    setEditingSlot(slot);
+    setTargetStatus(slot.admin_status);
+    setTargetNotes(slot.notes ?? "");
+  };
+
+  const handleUpdateStatus = async () => {
+    if (!editingSlot) return;
+    setIsUpdating(true);
+    try {
+      await adminUpdateSlot({
+        data: {
+          id: editingSlot.id,
+          admin_status: targetStatus,
+          notes: targetNotes.trim() ? targetNotes.trim() : null,
+        },
+      });
+      toast.success(`Bay ${editingSlot.code} status updated to ${targetStatus}`);
+      setEditingSlot(null);
+      await loadSlots();
+    } catch (err: unknown) {
+      console.error("[AdminSlotsPage] Status update failed:", err);
+      toast.error("Failed to update slot status");
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
   return (
@@ -92,10 +146,17 @@ function AdminSlotsPage() {
             <h1 className="font-display text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
               Slots
             </h1>
-            <DemoBadge />
+            <Badge
+              variant="outline"
+              className="gap-1 border-primary/40 bg-primary/10 text-primary text-[10px] font-mono px-2 py-0.5 rounded"
+            >
+              <span className="size-1.5 rounded-full bg-emerald-400" />
+              Live facility bays
+            </Badge>
           </div>
           <p className="mt-1 text-xs sm:text-sm text-muted-foreground">
-            Directory of parking bays, types, tariffs, and current status.
+            Directory of parking bays, types, tariffs, and current status. Live occupancy arrives
+            with bookings.
           </p>
         </div>
 
@@ -103,7 +164,7 @@ function AdminSlotsPage() {
           <Button
             size="sm"
             variant="outline"
-            onClick={handleRefresh}
+            onClick={loadSlots}
             disabled={loading}
             className="h-8 text-xs gap-1.5"
           >
@@ -126,11 +187,8 @@ function AdminSlotsPage() {
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
             <Input
               value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                setPage(1);
-              }}
-              placeholder="Filter by bay code or license plate..."
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Filter by bay code (e.g. G1-01, B2-15)..."
               className="h-8 pl-8 text-xs bg-background"
             />
           </div>
@@ -167,7 +225,6 @@ function AdminSlotsPage() {
             <option value="standard">Standard</option>
             <option value="ev">EV Charger</option>
             <option value="accessible">Accessible</option>
-            <option value="valet">Valet</option>
           </select>
 
           {/* Status Filter */}
@@ -180,11 +237,9 @@ function AdminSlotsPage() {
             className="h-8 rounded-md border border-input bg-background px-2.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
           >
             <option value="All">All Statuses</option>
-            <option value="free">Available</option>
-            <option value="occupied">Occupied</option>
-            <option value="booked">Booked</option>
-            <option value="blocked">Blocked</option>
+            <option value="active">Active (Available)</option>
             <option value="maintenance">Maintenance</option>
+            <option value="blocked">Blocked</option>
           </select>
 
           {/* Rows per page */}
@@ -203,13 +258,13 @@ function AdminSlotsPage() {
         </div>
       </div>
 
-      {/* ── Slots Table Container (horizontal scroll container) ── */}
+      {/* ── Slots Table Container ── */}
       <div className="rounded-xl border border-border bg-surface overflow-hidden shadow-sm">
         {errorMsg ? (
           <div className="p-8 text-center text-xs">
             <AlertCircle className="size-8 mx-auto mb-2 text-destructive" />
             <p className="text-foreground font-semibold">{errorMsg}</p>
-            <Button size="sm" variant="outline" onClick={handleRefresh} className="mt-4 text-xs">
+            <Button size="sm" variant="outline" onClick={loadSlots} className="mt-4 text-xs">
               Try again
             </Button>
           </div>
@@ -222,22 +277,22 @@ function AdminSlotsPage() {
                     Bay Code
                   </TableHead>
                   <TableHead className="font-mono text-xs uppercase text-muted-foreground">
-                    Floor / Zone
+                    Level / Zone
                   </TableHead>
                   <TableHead className="font-mono text-xs uppercase text-muted-foreground">
                     Type
                   </TableHead>
                   <TableHead className="font-mono text-xs uppercase text-muted-foreground">
-                    Status
+                    Admin Status
                   </TableHead>
                   <TableHead className="font-mono text-xs uppercase text-muted-foreground">
-                    Occupant Vehicle
+                    Tariff
                   </TableHead>
                   <TableHead className="font-mono text-xs uppercase text-muted-foreground">
-                    Duration
+                    Notes
                   </TableHead>
                   <TableHead className="font-mono text-xs uppercase text-muted-foreground text-right">
-                    Tariff
+                    Action
                   </TableHead>
                 </TableRow>
               </TableHeader>
@@ -250,7 +305,7 @@ function AdminSlotsPage() {
                       </TableCell>
                     </TableRow>
                   ))
-                ) : paginatedSlots.length === 0 ? (
+                ) : slots.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="h-36 text-center text-muted-foreground">
                       <div className="flex flex-col items-center justify-center gap-1.5 py-6">
@@ -260,58 +315,65 @@ function AdminSlotsPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  paginatedSlots.map((slot) => (
+                  slots.map((slot) => (
                     <TableRow key={slot.id} className="border-border/60 text-xs hover:bg-accent/40">
                       <TableCell className="font-mono font-bold text-foreground tabular-nums">
                         {slot.code}
                       </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        Level {slot.level} • {slot.zone}
+                      <TableCell className="text-muted-foreground font-mono">
+                        Level {slot.level_code} • Zone {slot.zone}
                       </TableCell>
                       <TableCell>
                         <span className="inline-flex items-center gap-1.5 capitalize text-foreground">
-                          {slot.type === "ev" ? (
-                            <Zap className="size-3 text-cyan-400" />
-                          ) : slot.type === "valet" ? (
-                            <Sparkles className="size-3 text-amber-400" />
+                          {slot.slot_type === "ev" ? (
+                            <>
+                              <Zap className="size-3 text-cyan-400" />
+                              EV Charger
+                            </>
+                          ) : slot.slot_type === "accessible" ? (
+                            <>
+                              <span className="text-blue-400 font-bold">♿</span>
+                              Accessible
+                            </>
                           ) : (
-                            <CarFront className="size-3 text-muted-foreground" />
+                            <>
+                              <CarFront className="size-3 text-muted-foreground" />
+                              Standard
+                            </>
                           )}
-                          {slot.type}
                         </span>
                       </TableCell>
                       <TableCell>
                         <Badge
                           variant="outline"
                           className={`text-[10px] font-mono uppercase px-2 py-0.5 rounded ${
-                            slot.status === "free"
+                            slot.admin_status === "active"
                               ? "border-emerald-500/40 text-emerald-400 bg-emerald-500/10"
-                              : slot.status === "occupied"
-                                ? "border-border/60 text-muted-foreground bg-muted/40"
-                                : slot.status === "booked"
-                                  ? "border-cyan-500/40 text-cyan-400 bg-cyan-500/10"
-                                  : slot.status === "maintenance"
-                                    ? "border-destructive/40 text-destructive bg-destructive/10"
-                                    : "border-amber-500/40 text-amber-400 bg-amber-500/10"
+                              : slot.admin_status === "maintenance"
+                                ? "border-rose-500/40 text-rose-400 bg-rose-500/10"
+                                : "border-amber-500/40 text-amber-400 bg-amber-500/10"
                           }`}
                         >
-                          {slot.status}
+                          {slot.admin_status === "active" ? "Available" : slot.admin_status}
                         </Badge>
                       </TableCell>
-                      <TableCell className="font-mono text-muted-foreground">
-                        {slot.currentVehiclePlate ? (
-                          <span className="text-foreground font-semibold">
-                            {slot.currentVehiclePlate}
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground/50">—</span>
-                        )}
+                      <TableCell className="font-mono text-foreground tabular-nums">
+                        ₹{Math.round(slot.hourly_rate_paise / 100)}/h
                       </TableCell>
-                      <TableCell className="font-mono text-muted-foreground tabular-nums">
-                        {slot.parkedSince ?? "—"}
+                      <TableCell className="text-muted-foreground text-xs max-w-xs truncate">
+                        {slot.notes ? slot.notes : <span className="opacity-40">—</span>}
                       </TableCell>
-                      <TableCell className="font-mono font-semibold text-right text-foreground tabular-nums">
-                        ₹{slot.hourlyRate}/h
+                      <TableCell className="text-right">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => openStatusDialog(slot)}
+                          className="h-7 px-2 text-xs gap-1 font-mono hover:bg-accent"
+                          title="Change bay state"
+                        >
+                          <Settings2 className="size-3" />
+                          Set Status
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))
@@ -321,12 +383,11 @@ function AdminSlotsPage() {
           </div>
         )}
 
-        {/* Consistent Pagination Footer */}
+        {/* Pagination Footer */}
         <div className="border-t border-border/60 px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted-foreground font-mono">
           <div>
-            Showing{" "}
-            <strong className="text-foreground tabular-nums">{paginatedSlots.length}</strong> of{" "}
-            <strong className="text-foreground tabular-nums">{filteredSlots.length}</strong> bays
+            Showing <strong className="text-foreground tabular-nums">{slots.length}</strong> of{" "}
+            <strong className="text-foreground tabular-nums">{totalCount}</strong> bays
           </div>
 
           <div className="flex items-center gap-2">
@@ -356,6 +417,72 @@ function AdminSlotsPage() {
           </div>
         </div>
       </div>
+
+      {/* ── Confirm Status Change Dialog ── */}
+      <Dialog open={Boolean(editingSlot)} onOpenChange={(open) => !open && setEditingSlot(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Update Bay State: {editingSlot?.code}</DialogTitle>
+            <DialogDescription>
+              Set operational status for Level {editingSlot?.level_code} • Zone {editingSlot?.zone}.
+              Changes take immediate effect for drivers.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-foreground">Operational State</label>
+              <div className="grid grid-cols-3 gap-2">
+                {(["active", "maintenance", "blocked"] as const).map((st) => (
+                  <button
+                    key={st}
+                    type="button"
+                    onClick={() => setTargetStatus(st)}
+                    className={`px-3 py-2 rounded-lg border text-xs font-mono capitalize transition-colors text-center ${
+                      targetStatus === st
+                        ? "border-primary bg-primary/10 text-primary font-semibold ring-1 ring-primary"
+                        : "border-border bg-background text-muted-foreground hover:bg-accent"
+                    }`}
+                  >
+                    {st === "active" ? "Active (Available)" : st}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-foreground">Admin Notes (optional)</label>
+              <textarea
+                value={targetNotes}
+                onChange={(e) => setTargetNotes(e.target.value)}
+                placeholder="Reason for maintenance or operational notes..."
+                rows={3}
+                className="w-full rounded-md border border-input bg-background p-2.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setEditingSlot(null)}
+              disabled={isUpdating}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleUpdateStatus}
+              disabled={isUpdating}
+              className="gap-1.5"
+            >
+              {isUpdating && <RefreshCw className="size-3.5 animate-spin" />}
+              Confirm Status Change
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

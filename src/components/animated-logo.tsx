@@ -74,32 +74,21 @@ export function AnimatedLogo({
   const sizeStyle: CSSProperties = {
     ...style,
     ...(size ? { width: size, height: size } : {}),
-    ...(colorOverrides?.halo
-      ? ({ "--pg-glow": colorOverrides.halo } as CSSProperties)
-      : {}),
+    ...(colorOverrides?.halo ? ({ "--pg-glow": colorOverrides.halo } as CSSProperties) : {}),
   };
 
   return (
     <div
-      className={cn(
-        "parkgrid-logo-root",
-        !isStatic && "parkgrid-logo-interactive",
-        className,
-      )}
+      className={cn("parkgrid-logo-root", !isStatic && "parkgrid-logo-interactive", className)}
       style={sizeStyle}
       data-animating={isAnimating ? "true" : "false"}
       data-preset={rawPreset}
     >
       {/* Gentle cyan ambient glow that blooms and fades naturally during entrance */}
-      {isAnimating && (
-        <span className="parkgrid-logo-ambient-glow" aria-hidden="true" />
-      )}
+      {isAnimating && <span className="parkgrid-logo-ambient-glow" aria-hidden="true" />}
 
       {/* Inner logo wrapper with smooth fade-in and subtle scale-up */}
-      <span
-        className="parkgrid-logo-inner"
-        onAnimationEnd={() => setHasEntered(true)}
-      >
+      <span className="parkgrid-logo-inner" onAnimationEnd={() => setHasEntered(true)}>
         <img
           src={src}
           alt={alt}
