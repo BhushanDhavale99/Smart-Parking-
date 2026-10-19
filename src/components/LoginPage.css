@@ -7,33 +7,23 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: #060913;
-  color: #f1f5f9;
+  background-color: var(--background);
+  color: var(--foreground);
   overflow: hidden;
   font-family: var(--font-sans, system-ui, -apple-system, sans-serif);
 }
 
-/* ── High-Tech Perspective Road & Grid Background ── */
+/* ── Modern Architectural Ambient Light (Theme-Aware, No Hairline Grid) ── */
 .login-grid-bg {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background-image:
-    linear-gradient(to right, rgba(0, 242, 254, 0.05) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(0, 242, 254, 0.05) 1px, transparent 1px);
-  background-size: 48px 48px;
-  mask-image: radial-gradient(
-    ellipse at 50% 50%,
-    rgba(0, 0, 0, 0.9) 0%,
-    rgba(0, 0, 0, 0.2) 65%,
-    transparent 100%
+  background-image: radial-gradient(
+    circle at 50% 20%,
+    var(--primary-glow) 0%,
+    transparent 65%
   );
-  -webkit-mask-image: radial-gradient(
-    ellipse at 50% 50%,
-    rgba(0, 0, 0, 0.9) 0%,
-    rgba(0, 0, 0, 0.2) 65%,
-    transparent 100%
-  );
+  opacity: 0.6;
 }
 
 /* Ambient Radial Glows */
@@ -46,11 +36,11 @@
   height: 500px;
   background: radial-gradient(
     ellipse,
-    rgba(0, 242, 254, 0.12) 0%,
-    rgba(14, 165, 233, 0.04) 50%,
-    transparent 80%
+    var(--primary-glow) 0%,
+    transparent 75%
   );
   pointer-events: none;
+  opacity: 0.8;
 }
 
 .login-glow-secondary {
@@ -60,23 +50,25 @@
   transform: translateX(-50%);
   width: 900px;
   height: 450px;
-  background: radial-gradient(ellipse, rgba(0, 242, 254, 0.08) 0%, transparent 70%);
+  background: radial-gradient(ellipse, var(--primary-glow) 0%, transparent 70%);
   pointer-events: none;
+  opacity: 0.5;
 }
 
-/* Animated Road Marking Lines at Bottom */
+/* Facility Road Line at Bottom */
 .login-road-stripes {
   position: absolute;
   bottom: 0;
   left: 0;
   right: 0;
   height: 120px;
-  background: linear-gradient(to top, rgba(0, 242, 254, 0.04), transparent);
-  border-top: 1px dashed rgba(0, 242, 254, 0.15);
+  background: linear-gradient(to top, var(--primary-glow), transparent);
+  border-top: 1px dashed var(--border);
+  opacity: 0.4;
   pointer-events: none;
 }
 
-/* Glassmorphic Login Card */
+/* Elevated Login Card */
 .login-glass-card {
   position: relative;
   z-index: 10;
@@ -84,15 +76,12 @@
   max-width: 480px;
   margin: 1.5rem;
   padding: 2.25rem 2.25rem;
-  background: rgba(10, 15, 29, 0.78);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(0, 242, 254, 0.22);
+  background: var(--card);
+  border: 1px solid var(--border);
   box-shadow:
-    0 20px 50px rgba(0, 0, 0, 0.6),
-    0 0 40px rgba(0, 242, 254, 0.08),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
-  border-radius: 14px;
+    0 24px 48px -12px rgba(0, 0, 0, 0.4),
+    0 0 24px var(--primary-glow);
+  border-radius: var(--radius-xl, 0.75rem);
   animation: loginCardFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
@@ -122,27 +111,27 @@
   gap: 0.75rem;
   width: 100%;
   padding: 0.75rem 1rem;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 8px;
-  color: #e2e8f0;
+  background: var(--surface, var(--background));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 0.375rem);
+  color: var(--foreground);
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .login-social-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(0, 242, 254, 0.4);
-  color: #ffffff;
+  background: var(--accent);
+  border-color: var(--primary);
+  color: var(--accent-foreground);
   transform: translateY(-1px);
-  box-shadow: 0 4px 16px rgba(0, 242, 254, 0.08);
+  box-shadow: 0 4px 16px var(--primary-glow);
 }
 
 .login-social-btn:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px rgba(0, 242, 254, 0.6);
+  box-shadow: 0 0 0 2px var(--ring);
 }
 
 .login-social-btn:active {
@@ -159,25 +148,24 @@
 .login-input {
   width: 100%;
   padding: 0.75rem 1rem 0.75rem 2.5rem;
-  background: rgba(6, 11, 23, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 8px;
-  color: #f8fafc;
+  background: var(--background);
+  border: 1px solid var(--input);
+  border-radius: var(--radius-md, 0.375rem);
+  color: var(--foreground);
   font-size: 0.875rem;
-  transition: all 0.2s ease;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .login-input:focus {
   outline: none;
-  border-color: #00f2fe;
-  background: rgba(8, 14, 28, 0.95);
+  border-color: var(--primary);
   box-shadow:
-    0 0 0 2px rgba(0, 242, 254, 0.25),
-    0 0 15px rgba(0, 242, 254, 0.12);
+    0 0 0 2px var(--ring),
+    0 0 16px var(--primary-glow);
 }
 
 .login-input::placeholder {
-  color: #64748b;
+  color: var(--muted-foreground);
 }
 
 .login-input-icon {
@@ -185,14 +173,14 @@
   left: 0.875rem;
   width: 1.125rem;
   height: 1.125rem;
-  color: #64748b;
+  color: var(--muted-foreground);
   pointer-events: none;
   transition: color 0.2s ease;
 }
 
 .login-input:focus ~ .login-input-icon,
 .login-input-wrap:focus-within .login-input-icon {
-  color: #00f2fe;
+  color: var(--primary);
 }
 
 .login-toggle-eye {
@@ -204,18 +192,18 @@
   padding: 0.35rem;
   background: transparent;
   border: none;
-  color: #64748b;
+  color: var(--muted-foreground);
   cursor: pointer;
   border-radius: 4px;
   transition: color 0.18s ease;
 }
 
 .login-toggle-eye:hover {
-  color: #00f2fe;
+  color: var(--primary);
 }
 
 .login-toggle-eye:focus-visible {
-  outline: 2px solid #00f2fe;
+  outline: 2px solid var(--primary);
 }
 
 /* Primary Login Action Button */
@@ -227,25 +215,23 @@
   gap: 0.5rem;
   width: 100%;
   padding: 0.85rem 1.25rem;
-  background: linear-gradient(135deg, #00f2fe 0%, #0284c7 100%);
+  background: var(--primary);
   border: none;
-  border-radius: 8px;
-  color: #04101e;
+  border-radius: var(--radius-md, 0.375rem);
+  color: var(--primary-foreground);
   font-size: 0.9rem;
   font-weight: 600;
   letter-spacing: 0.02em;
   cursor: pointer;
   transition: all 0.24s cubic-bezier(0.16, 1, 0.3, 1);
   box-shadow:
-    0 4px 20px rgba(0, 242, 254, 0.3),
-    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+    0 4px 16px var(--primary-glow);
 }
 
 .login-submit-btn:hover:not(:disabled) {
   transform: translateY(-2px);
   box-shadow:
-    0 8px 30px rgba(0, 242, 254, 0.45),
-    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+    0 8px 24px var(--primary-glow);
   filter: brightness(1.05);
 }
 
@@ -254,7 +240,7 @@
 }
 
 .login-submit-btn:disabled {
-  opacity: 0.7;
+  opacity: 0.6;
   cursor: not-allowed;
   filter: grayscale(0.2);
 }
@@ -265,7 +251,7 @@
   align-items: center;
   gap: 1rem;
   margin: 1.25rem 0;
-  color: #64748b;
+  color: var(--muted-foreground);
   font-size: 0.75rem;
   font-family: var(--font-mono, monospace);
   letter-spacing: 0.1em;
@@ -277,7 +263,7 @@
   content: "";
   flex: 1;
   height: 1px;
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--border);
 }
 
 /* Exit Fadeout for intro transition */

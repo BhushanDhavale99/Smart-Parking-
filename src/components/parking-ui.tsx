@@ -26,12 +26,12 @@ import {
 import { listSlots, type ParkingSlotRow } from "@/lib/parking.server";
 
 const statusClasses: Record<SlotStatus, string> = {
-  available: "border-available/50 bg-available/10 text-available",
-  occupied: "border-occupied/45 bg-occupied/10 text-occupied",
-  reserved: "border-reserved/50 bg-reserved/10 text-reserved",
-  selected: "border-selected bg-selected/20 text-selected shadow-[0_0_24px_var(--selected-glow)]",
-  maintenance: "border-muted-foreground/40 bg-muted text-muted-foreground",
-  blocked: "border-muted-foreground/40 bg-muted text-muted-foreground",
+  available: "border-available/40 bg-available/8 text-available hover:border-available hover:bg-available/15",
+  occupied: "border-occupied/35 bg-occupied/8 text-occupied opacity-80",
+  reserved: "border-reserved/40 bg-reserved/8 text-reserved opacity-85",
+  selected: "border-selected bg-selected/20 text-selected shadow-[0_0_20px_var(--selected-glow)] ring-2 ring-selected/50",
+  maintenance: "border-border/60 bg-muted/40 text-muted-foreground",
+  blocked: "border-border/60 bg-muted/40 text-muted-foreground",
 };
 
 export function StatusBadge({
@@ -47,28 +47,84 @@ export function StatusBadge({
     | "expired"
     | string;
 }) {
-  const tones: Record<string, string> = {
-    available: "bg-available/12 text-available",
-    occupied: "bg-occupied/12 text-occupied",
-    reserved: "bg-reserved/12 text-reserved",
-    confirmed: "bg-available/12 text-available",
-    selected: "bg-selected/12 text-selected",
-    active: "bg-selected/12 text-selected",
-    completed: "bg-muted text-muted-foreground",
-    cancelled: "bg-occupied/12 text-occupied",
-    no_show: "bg-occupied/12 text-occupied",
-    expired: "bg-muted text-muted-foreground",
-    maintenance: "bg-muted text-muted-foreground",
-    blocked: "bg-muted text-muted-foreground",
+  const tones: Record<string, { bg: string; dot: string; label: string }> = {
+    available: {
+      bg: "border-available/30 bg-available/10 text-available",
+      dot: "bg-available",
+      label: "Available",
+    },
+    occupied: {
+      bg: "border-occupied/30 bg-occupied/10 text-occupied",
+      dot: "bg-occupied",
+      label: "Occupied",
+    },
+    reserved: {
+      bg: "border-reserved/30 bg-reserved/10 text-reserved",
+      dot: "bg-reserved",
+      label: "Reserved",
+    },
+    confirmed: {
+      bg: "border-available/30 bg-available/10 text-available",
+      dot: "bg-available",
+      label: "Confirmed",
+    },
+    selected: {
+      bg: "border-selected/40 bg-selected/15 text-selected shadow-[0_0_12px_var(--selected-glow)]",
+      dot: "bg-selected",
+      label: "Selected",
+    },
+    active: {
+      bg: "border-primary/40 bg-primary/15 text-primary shadow-[0_0_12px_var(--primary-glow)]",
+      dot: "bg-primary",
+      label: "Active",
+    },
+    completed: {
+      bg: "border-border bg-muted/50 text-muted-foreground",
+      dot: "bg-muted-foreground",
+      label: "Completed",
+    },
+    cancelled: {
+      bg: "border-destructive/30 bg-destructive/10 text-destructive",
+      dot: "bg-destructive",
+      label: "Cancelled",
+    },
+    no_show: {
+      bg: "border-destructive/30 bg-destructive/10 text-destructive",
+      dot: "bg-destructive",
+      label: "No Show",
+    },
+    expired: {
+      bg: "border-border bg-muted/50 text-muted-foreground",
+      dot: "bg-muted-foreground",
+      label: "Expired",
+    },
+    maintenance: {
+      bg: "border-border bg-muted/50 text-muted-foreground",
+      dot: "bg-muted-foreground",
+      label: "Maintenance",
+    },
+    blocked: {
+      bg: "border-border bg-muted/50 text-muted-foreground",
+      dot: "bg-muted-foreground",
+      label: "Blocked",
+    },
   };
+
+  const current = tones[status] ?? {
+    bg: "border-border bg-muted/50 text-muted-foreground",
+    dot: "bg-muted-foreground",
+    label: status,
+  };
+
   return (
     <span
       className={cn(
-        "inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase",
-        tones[status] ?? "bg-muted text-muted-foreground",
+        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-mono text-[10px] font-semibold tracking-wide uppercase",
+        current.bg,
       )}
     >
-      {status}
+      <span className={cn("size-1.5 rounded-full shrink-0", current.dot)} />
+      {current.label}
     </span>
   );
 }
@@ -108,10 +164,10 @@ export function ParkingSlot({
       disabled={disabled}
       onClick={() => onSelect?.(slot)}
       className={cn(
-        "group relative flex min-h-20 flex-col justify-between overflow-hidden border p-2.5 text-left transition duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-75",
+        "group relative flex min-h-20 flex-col justify-between overflow-hidden rounded-lg border p-2.5 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-75",
         compact ? "min-h-16" : "sm:min-h-24",
         statusClasses[displayStatus] ?? statusClasses.available,
-        !disabled && "hover:-translate-y-1 hover:scale-[1.02]",
+        !disabled && "hover:-translate-y-0.5 hover:shadow-md",
       )}
     >
       <div className="flex w-full items-start justify-between gap-1">
@@ -258,28 +314,32 @@ export function ParkingMap({
   };
 
   return (
-    <div className="parking-grid overflow-hidden border border-border bg-surface p-4 sm:p-6">
+    <div className="parking-grid overflow-hidden rounded-2xl border border-border/80 bg-surface/95 p-4 sm:p-6 shadow-sm">
       {!preview && (
         <div className="mb-5 flex flex-col gap-3">
-          {/* ── Floor selector ── */}
+          {/* ── Floor & Zone selectors ── */}
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap gap-1" role="tablist" aria-label="Parking level">
+            <div className="flex flex-wrap gap-1 rounded-xl border border-border/70 bg-background/60 p-1" role="tablist" aria-label="Parking level">
               {ORDERED_LEVELS.map((code) => {
                 const conf = LEVEL_CONFIG[code];
+                const isSelected = level === code;
                 return (
                   <Button
                     key={code}
                     size="sm"
                     role="tab"
-                    aria-selected={level === code}
-                    variant={level === code ? "default" : "ghost"}
+                    aria-selected={isSelected}
+                    variant={isSelected ? "default" : "ghost"}
                     onClick={() => setLevel(code)}
-                    className="font-mono"
+                    className={cn(
+                      "rounded-lg font-mono text-xs transition-all",
+                      isSelected && "shadow-sm",
+                    )}
                   >
                     <span>{conf.label}</span>
-                    <span className="ml-1.5 hidden text-[9px] font-normal capitalize opacity-60 sm:inline">
+                    <span className="ml-1.5 hidden text-[9px] font-normal capitalize opacity-70 sm:inline">
                       {conf.category === "basement"
-                        ? "↓ Underground"
+                        ? "↓ Under"
                         : conf.category === "ground"
                           ? "Ground"
                           : "↑ Upper"}
@@ -289,7 +349,7 @@ export function ParkingMap({
               })}
             </div>
             {/* ── Zone selector ── */}
-            <div className="flex gap-1" role="tablist" aria-label="Parking zone">
+            <div className="flex gap-1 rounded-xl border border-border/70 bg-background/60 p-1" role="tablist" aria-label="Parking zone">
               {(["All", "A", "B", "EV"] as const).map((item) => (
                 <Button
                   key={item}
@@ -297,8 +357,9 @@ export function ParkingMap({
                   aria-pressed={zone === item}
                   variant={zone === item ? "secondary" : "ghost"}
                   onClick={() => setZone(item)}
+                  className="rounded-lg text-xs"
                 >
-                  {item === "EV" ? "EV Zone" : item === "All" ? "All zones" : `Zone ${item}`}
+                  {item === "EV" ? "⚡ EV Zone" : item === "All" ? "All zones" : `Zone ${item}`}
                 </Button>
               ))}
             </div>
@@ -307,11 +368,11 @@ export function ParkingMap({
           {/* ── Heavy-vehicle notice ── */}
           <div
             role="note"
-            className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/8 px-3 py-2 text-[11px] text-amber-500"
+            className="flex items-start gap-2.5 rounded-xl border border-amber-500/25 bg-amber-500/10 px-3.5 py-2.5 text-xs text-amber-500"
           >
-            <TriangleAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+            <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
             <span>
-              <strong className="font-semibold">Heavy Vehicles</strong> are allowed only on{" "}
+              <strong className="font-semibold">Heavy Vehicles</strong> are permitted only on{" "}
               <strong className="font-semibold">Ground (G1)</strong> and{" "}
               <strong className="font-semibold">Basement (B1 / B2)</strong> levels.
             </span>
@@ -320,19 +381,19 @@ export function ParkingMap({
       )}
       <div className="mb-3 flex items-center justify-between font-mono text-[10px] uppercase text-muted-foreground">
         <span>Entrance</span>
-        <span className="flex items-center gap-1">
+        <span className="flex items-center gap-1 font-semibold text-primary">
           <Navigation className="size-3" /> One way
         </span>
         <span>Exit</span>
       </div>
 
       {loading ? (
-        <div className="flex min-h-[320px] flex-col items-center justify-center gap-2 rounded-lg border border-border/40 bg-surface/60 font-mono text-xs text-muted-foreground">
+        <div className="flex min-h-[320px] flex-col items-center justify-center gap-2 rounded-xl border border-border/40 bg-surface/60 font-mono text-xs text-muted-foreground">
           <span className="live-dot" />
           <span>Loading live parking grid...</span>
         </div>
       ) : errorMsg ? (
-        <div className="flex min-h-[320px] flex-col items-center justify-center gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-6 text-center text-xs">
+        <div className="flex min-h-[320px] flex-col items-center justify-center gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-6 text-center text-xs">
           <AlertCircle className="size-6 text-destructive" />
           <p className="font-medium text-foreground">{errorMsg}</p>
           <Button size="sm" variant="outline" onClick={fetchSlots} className="gap-1.5 text-xs">
@@ -340,14 +401,14 @@ export function ParkingMap({
           </Button>
         </div>
       ) : visibleSlots.length === 0 ? (
-        <div className="flex min-h-[320px] flex-col items-center justify-center gap-2 rounded-lg border border-border/40 bg-surface/40 p-6 text-center text-xs text-muted-foreground">
+        <div className="flex min-h-[320px] flex-col items-center justify-center gap-2 rounded-xl border border-border/40 bg-surface/40 p-6 text-center text-xs text-muted-foreground">
           <CircleSlash2 className="size-6 opacity-40" />
           <p>No parking bays found for this filter.</p>
         </div>
       ) : (
         <Suspense
           fallback={
-            <div className="flex min-h-[320px] flex-col items-center justify-center gap-2 rounded-lg border border-border/40 bg-surface/60 font-mono text-xs text-muted-foreground">
+            <div className="flex min-h-[320px] flex-col items-center justify-center gap-2 rounded-xl border border-border/40 bg-surface/60 font-mono text-xs text-muted-foreground">
               <span className="live-dot" />
               <span>Rendering 3D Parking Grid...</span>
             </div>
@@ -367,9 +428,9 @@ export function ParkingMap({
       <p className="sr-only" aria-live="polite">
         {announcement}
       </p>
-      <div className="road-lane my-4 flex h-14 items-center justify-around border-y border-dashed border-road-line/30 bg-road/70 text-road-line">
+      <div className="road-lane my-4 flex h-14 items-center justify-around rounded-xl border-y border-dashed border-road-line/30 bg-road/75 text-road-line shadow-inner">
         <ArrowDown className="size-4 rotate-90" />
-        <span className="font-mono text-[10px] uppercase tracking-widest">Drive lane · 8 km/h</span>
+        <span className="font-mono text-[10px] uppercase tracking-widest font-semibold">Drive lane · 8 km/h</span>
         <ArrowDown className="size-4 rotate-90" />
       </div>
       <div className="flex flex-wrap items-center justify-between gap-y-2 text-[11px] text-muted-foreground">

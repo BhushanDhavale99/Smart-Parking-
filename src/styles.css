@@ -550,12 +550,14 @@
     height: 2.75rem;
     width: 100%;
     border: 1px solid var(--input);
+    border-radius: var(--radius-md, 0.375rem);
     background: var(--background);
-    padding: 0 0.75rem;
+    padding: 0 0.875rem;
     color: var(--foreground);
     font-family: var(--font-sans);
     font-size: 0.875rem;
     text-transform: none;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
   }
   .field-input:focus {
     border-color: var(--primary);
@@ -563,10 +565,7 @@
     outline: none;
   }
   .parking-grid {
-    background-image:
-      linear-gradient(oklch(0.5 0.01 240 / 5%) 1px, transparent 1px),
-      linear-gradient(90deg, oklch(0.5 0.01 240 / 5%) 1px, transparent 1px);
-    background-size: 24px 24px;
+    background: radial-gradient(ellipse at 50% 30%, oklch(0.5 0.01 240 / 7%) 0%, transparent 75%), var(--surface);
   }
   .road-lane {
     position: relative;
@@ -921,10 +920,7 @@ header {
 @layer components {
   .ai-chat-bg {
     background-color: var(--surface);
-    background-image:
-      linear-gradient(oklch(0.5 0.01 240 / 4%) 1px, transparent 1px),
-      linear-gradient(90deg, oklch(0.5 0.01 240 / 4%) 1px, transparent 1px);
-    background-size: 32px 32px;
+    background-image: radial-gradient(ellipse at 50% 0%, var(--primary-glow) 0%, transparent 70%);
   }
   .ai-status-chip {
     display: inline-flex;
@@ -1014,7 +1010,7 @@ header {
     text-align: left;
     cursor: pointer;
     transition:
-      transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+      transform 0.22s cubic-bezier(0.16, 1, 0.3, 1),
       border-color 0.2s ease,
       box-shadow 0.22s ease;
   }

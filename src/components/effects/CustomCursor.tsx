@@ -238,8 +238,8 @@ function CursorImpl() {
           boxShadow: `0 0 ${glowBlur / 2}px ${colours.glow}`,
           opacity: ringOpacity,
           transition: [
-            "width 220ms cubic-bezier(.34,1.56,.64,1)",
-            "height 220ms cubic-bezier(.34,1.56,.64,1)",
+            "width 220ms cubic-bezier(0.16, 1, 0.3, 1)",
+            "height 220ms cubic-bezier(0.16, 1, 0.3, 1)",
             "border-color 300ms ease",
             "box-shadow 300ms ease",
           ].join(", "),

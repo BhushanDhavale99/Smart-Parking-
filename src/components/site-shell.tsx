@@ -17,6 +17,8 @@ import {
   ChevronDown,
   HelpCircle,
   LogOut,
+  Headphones,
+  ShieldCheck,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Session } from "@supabase/supabase-js";
@@ -73,7 +75,7 @@ export function BrandMark({
 }) {
   return (
     <span className="flex items-center gap-2.5">
-      <span className="grid size-12 sm:size-14 shrink-0 place-items-center overflow-hidden rounded-lg border border-primary/30 bg-background shadow-[0_0_20px_var(--primary-glow)]">
+      <span className="grid size-11 sm:size-12 shrink-0 place-items-center overflow-hidden rounded-xl border border-primary/25 bg-background shadow-[0_0_16px_var(--primary-glow)] transition-transform duration-200 hover:scale-[1.03]">
         <AnimatedLogo
           src={parkGridLogo}
           alt="ParkGrid One"
@@ -83,9 +85,11 @@ export function BrandMark({
         />
       </span>
       {!compact && (
-        <span>
-          <strong className="block font-display text-sm leading-none">PARKGRID</strong>
-          <small className="font-mono text-[8px] uppercase tracking-[0.22em] text-muted-foreground">
+        <span className="flex flex-col justify-center">
+          <strong className="block font-display text-sm font-bold tracking-tight leading-none text-foreground">
+            PARKGRID
+          </strong>
+          <small className="mt-0.5 font-mono text-[8px] uppercase tracking-[0.2em] text-muted-foreground">
             BKC · Mumbai
           </small>
         </span>
@@ -263,7 +267,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
             <BrandMark />
           </Link>
           <nav
-            className="hidden items-center gap-0.5 xl:gap-1 lg:flex"
+            className="hidden items-center gap-1 xl:gap-1.5 lg:flex"
             aria-label="Main navigation"
           >
             {mainLinks.map(([to, label]) => {
@@ -274,8 +278,10 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
                   to={to}
                   aria-current={active ? "page" : undefined}
                   className={cn(
-                    "relative whitespace-nowrap rounded-md px-2.5 xl:px-3 py-2 text-xs font-medium transition-colors duration-250 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring after:absolute after:inset-x-2.5 xl:after:inset-x-3 after:bottom-1 after:h-px after:origin-left after:scale-x-0 after:bg-primary after:transition-transform",
-                    active && "text-primary after:scale-x-100",
+                    "relative whitespace-nowrap rounded-md px-2.5 xl:px-3 py-1.5 text-xs font-medium transition-colors duration-200 hover:bg-accent/80 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    active
+                      ? "text-primary font-semibold after:absolute after:inset-x-2.5 xl:after:inset-x-3 after:bottom-0 after:h-0.5 after:rounded-full after:bg-primary after:shadow-[0_0_8px_var(--primary-glow)]"
+                      : "text-muted-foreground",
                   )}
                 >
                   {label}
@@ -288,9 +294,9 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
                 to="/admin"
                 aria-current={isActive("/admin") ? "page" : undefined}
                 className={cn(
-                  "relative whitespace-nowrap rounded-md px-2.5 xl:px-3 py-2 text-xs font-medium transition-colors duration-250 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring text-amber-400/90 hover:text-amber-300",
+                  "relative whitespace-nowrap rounded-md px-2.5 xl:px-3 py-1.5 text-xs font-medium transition-colors duration-200 hover:bg-accent/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring text-amber-400/90 hover:text-amber-300",
                   isActive("/admin") &&
-                    "text-amber-400 font-semibold after:absolute after:inset-x-2.5 xl:after:inset-x-3 after:bottom-1 after:h-px after:origin-left after:bg-amber-400 after:scale-x-100",
+                    "text-amber-400 font-semibold after:absolute after:inset-x-2.5 xl:after:inset-x-3 after:bottom-0 after:h-0.5 after:rounded-full after:bg-amber-400 after:shadow-[0_0_8px_oklch(0.75_0.18_70/40%)]",
                 )}
               >
                 Admin
@@ -303,23 +309,23 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
                 <button
                   type="button"
                   className={cn(
-                    "relative inline-flex items-center gap-1 whitespace-nowrap rounded-md px-2.5 xl:px-3 py-2 text-xs font-medium transition-colors duration-250 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                    supportActive && "text-primary",
+                    "relative inline-flex items-center gap-1 whitespace-nowrap rounded-md px-2.5 xl:px-3 py-1.5 text-xs font-medium transition-colors duration-200 hover:bg-accent/80 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring text-muted-foreground",
+                    supportActive && "text-primary font-semibold",
                   )}
                 >
                   <HelpCircle className="size-3.5" />
                   Support
-                  <ChevronDown className="size-3 transition-transform duration-200 group-data-[state=open]:rotate-180" />
+                  <ChevronDown className="size-3 opacity-70 transition-transform duration-200 group-data-[state=open]:rotate-180" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-52 p-1.5 backdrop-blur-xl">
+              <DropdownMenuContent align="start" className="w-52 p-1.5 border border-border/80 bg-popover/95 backdrop-blur-xl shadow-xl rounded-lg">
                 {supportLinks.map(([to, label]) => (
                   <DropdownMenuItem key={to} asChild>
                     <Link
                       to={to}
                       className={cn(
                         "flex items-center gap-2 cursor-pointer rounded-md px-2.5 py-2 text-xs transition-colors",
-                        isActive(to) ? "bg-primary/15 text-primary font-medium" : "hover:bg-accent",
+                        isActive(to) ? "bg-primary/15 text-primary font-semibold" : "hover:bg-accent/80 text-foreground",
                       )}
                     >
                       <ChevronRight className="size-3 text-primary" />
@@ -389,27 +395,38 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
         >
           <nav
             id="mobile-navigation"
-            className="mx-4 mt-3 grid overflow-hidden border border-border bg-surface p-2 shadow-xl"
+            className="mx-4 mt-3 grid overflow-hidden rounded-2xl border border-border/80 bg-surface/98 p-3 shadow-2xl backdrop-blur-xl"
             aria-label="Mobile navigation"
           >
-            {mainLinks.map(([to, label], index) => (
-              <Link
-                key={to}
-                to={to}
-                aria-current={path === to ? "page" : undefined}
-                onClick={() => setOpen(false)}
-                className="rounded-md px-4 py-3 text-sm transition hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
-                style={{ transitionDelay: open ? `${index * 30}ms` : "0ms" }}
-              >
-                {label}
-              </Link>
-            ))}
+            <div className="grid gap-1">
+              {mainLinks.map(([to, label], index) => {
+                const active = path === to;
+                return (
+                  <Link
+                    key={to}
+                    to={to}
+                    aria-current={active ? "page" : undefined}
+                    onClick={() => setOpen(false)}
+                    className={cn(
+                      "flex items-center justify-between rounded-lg px-3.5 py-2.5 text-sm font-medium transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring",
+                      active
+                        ? "bg-primary/10 text-primary font-semibold"
+                        : "text-foreground",
+                    )}
+                    style={{ transitionDelay: open ? `${index * 25}ms` : "0ms" }}
+                  >
+                    <span>{label}</span>
+                    {active && <span className="size-1.5 rounded-full bg-primary" />}
+                  </Link>
+                );
+              })}
+            </div>
             {isAdmin && (
               <Link
                 to="/admin"
                 aria-current={path.startsWith("/admin") ? "page" : undefined}
                 onClick={() => setOpen(false)}
-                className="flex items-center justify-between rounded-md px-4 py-3 text-sm font-medium text-amber-400 transition hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
+                className="mt-1 flex items-center justify-between rounded-lg px-3.5 py-2.5 text-sm font-medium text-amber-400 transition hover:bg-amber-400/10 focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <span>Admin Operations</span>
                 <span className="rounded border border-amber-400/30 bg-amber-400/10 px-1.5 py-0.5 font-mono text-[10px] text-amber-400">
@@ -418,29 +435,34 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
               </Link>
             )}
             {/* Support links in mobile nav */}
-            <div className="border-t border-border/60 my-1 pt-1">
-              <span className="block px-4 pt-2 pb-1 text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
-                Support
+            <div className="my-2 border-t border-border/60 pt-2">
+              <span className="block px-3.5 pb-1.5 text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+                Support &amp; Help
               </span>
-              {supportLinks.map(([to, label], index) => (
-                <Link
-                  key={to}
-                  to={to}
-                  aria-current={path === to ? "page" : undefined}
-                  onClick={() => setOpen(false)}
-                  className="flex items-center gap-2 rounded-md px-4 py-3 text-sm transition hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
-                  style={{ transitionDelay: open ? `${(mainLinks.length + index) * 30}ms` : "0ms" }}
-                >
-                  <ChevronRight className="size-3 text-primary" />
-                  {label}
-                </Link>
-              ))}
+              <div className="grid gap-1">
+                {supportLinks.map(([to, label], index) => (
+                  <Link
+                    key={to}
+                    to={to}
+                    aria-current={path === to ? "page" : undefined}
+                    onClick={() => setOpen(false)}
+                    className={cn(
+                      "flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm text-muted-foreground transition hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring",
+                      path === to && "bg-primary/10 text-primary font-semibold",
+                    )}
+                    style={{ transitionDelay: open ? `${(mainLinks.length + index) * 25}ms` : "0ms" }}
+                  >
+                    <ChevronRight className="size-3 text-primary" />
+                    {label}
+                  </Link>
+                ))}
+              </div>
             </div>
-            <div className="border-t border-border/80 my-1 pt-2 px-2">
-              <span className="block text-[10px] font-mono uppercase text-muted-foreground mb-1.5">
+            <div className="my-1 border-t border-border/60 px-2 pt-2">
+              <span className="mb-1.5 block text-[10px] font-mono uppercase text-muted-foreground">
                 Theme
               </span>
-              <ThemeSelector className="w-full justify-start py-2.5 px-3 border border-border" />
+              <ThemeSelector className="w-full justify-start rounded-lg border border-border/80 py-2.5 px-3" />
             </div>
             <button
               type="button"
@@ -448,36 +470,36 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
                 setOpen(false);
                 replayParkingIntro();
               }}
-              className="flex items-center gap-2 rounded-md px-4 py-3 text-left text-sm text-cyan-400 transition hover:bg-accent"
+              className="mt-1 flex items-center gap-2 rounded-lg px-3.5 py-2.5 text-left text-sm text-cyan-400 transition hover:bg-cyan-400/10"
             >
-              <Sparkles className="size-4" /> Watch Intro
+              <Sparkles className="size-4" /> Watch Opening Intro
             </button>
-            <div className="border-t border-border/80 my-1 pt-1">
+            <div className="my-2 border-t border-border/60 pt-2">
               {session ? (
-                <>
+                <div className="grid gap-1">
                   <Link
                     to="/profile"
                     onClick={() => setOpen(false)}
-                    className="flex items-center gap-2 rounded-md px-4 py-3 text-sm transition hover:bg-accent"
+                    className="flex items-center gap-2 rounded-lg px-3.5 py-2.5 text-sm text-foreground transition hover:bg-accent"
                   >
-                    <UserRound className="size-4" /> Profile & Settings
+                    <UserRound className="size-4 text-primary" /> Profile &amp; Settings
                   </Link>
                   <button
                     type="button"
                     onClick={() => {
-                      setOpen(false);
-                      window.dispatchEvent(new CustomEvent("parkgrid-logout"));
+                       setOpen(false);
+                       window.dispatchEvent(new CustomEvent("parkgrid-logout"));
                     }}
-                    className="flex w-full items-center gap-2 rounded-md px-4 py-3 text-left text-sm text-destructive transition hover:bg-accent"
+                    className="flex w-full items-center gap-2 rounded-lg px-3.5 py-2.5 text-left text-sm text-destructive transition hover:bg-destructive/10"
                   >
                     <LogOut className="size-4" /> Sign out
                   </button>
-                </>
+                </div>
               ) : (
                 <Link
                   to="/login"
                   onClick={() => setOpen(false)}
-                  className="flex items-center gap-2 rounded-md px-4 py-3 text-sm text-primary font-medium transition hover:bg-accent"
+                  className="flex items-center justify-center gap-2 rounded-lg bg-primary/10 px-3.5 py-2.5 text-sm font-semibold text-primary transition hover:bg-primary/20"
                 >
                   <UserRound className="size-4" /> Sign in
                 </Link>
@@ -514,13 +536,13 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
             <Link to="/" aria-label="ParkGrid One home">
               <BrandMark variant="static" />
             </Link>
-            <p className="max-w-[240px] text-sm leading-6 text-muted-foreground">
-              BKC Mumbai's premium connected parking facility — intelligent access, EV charging, and
-              round-the-clock security.
+            <p className="max-w-[260px] text-sm leading-6 text-muted-foreground">
+              BKC Mumbai's premium connected parking facility — intelligent barrier-free entry, high-speed EV charging, and round-the-clock surveillance.
             </p>
-            <p className="flex items-center gap-2 text-[11px] font-mono uppercase tracking-widest text-primary">
-              <span className="live-dot" aria-hidden="true" /> Open 24 hours, every day
-            </p>
+            <div className="inline-flex w-fit items-center gap-2 rounded-full border border-available/30 bg-available/10 px-3 py-1 font-mono text-[11px] text-available">
+              <span className="live-dot" aria-hidden="true" />
+              <span>Live · 5 Levels · 150 Bays</span>
+            </div>
           </div>
 
           {/* ── Col 2: Explore ── */}
@@ -566,7 +588,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
                 <span>
                   Bandra Kurla Complex,
                   <br />
-                  Mumbai, Maharashtra
+                  Mumbai, Maharashtra 400051
                 </span>
               </li>
               <li className="flex items-start gap-2.5">
@@ -582,8 +604,20 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
                 <span>
                   Near G-Block, Bandra East
                   <br />
-                  <span className="text-[11px] opacity-70">Separate entry &amp; exit lanes</span>
+                  <span className="text-[11px] opacity-70">Automated ANPR entry &amp; exit lanes</span>
                 </span>
+              </li>
+              <li className="flex items-start gap-2.5">
+                <Headphones className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
+                <div>
+                  <span className="block font-medium text-foreground">24/7 Security Desk</span>
+                  <a
+                    href="tel:+912250004999"
+                    className="text-xs transition-colors hover:text-primary"
+                  >
+                    +91 (022) 5000-4999
+                  </a>
+                </div>
               </li>
               <li className="flex items-start gap-2.5">
                 <Mail className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
@@ -644,9 +678,14 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
             <p className="text-[11px] text-muted-foreground">
               © 2026 ParkGrid One · Bandra Kurla Complex, Mumbai
             </p>
-            <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground/60">
-              PARKGRID · BKC · MUMBAI
-            </p>
+            <div className="flex items-center gap-4 text-[10px] font-mono text-muted-foreground/80">
+              <span className="flex items-center gap-1.5">
+                <span className="size-1.5 rounded-full bg-available" />
+                All Systems Operational
+              </span>
+              <span>·</span>
+              <span>BKC · MUMBAI</span>
+            </div>
           </div>
         </div>
       </footer>

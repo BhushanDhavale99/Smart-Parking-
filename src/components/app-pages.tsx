@@ -192,7 +192,7 @@ export function HomePage() {
               </Link>
             </div>
           </div>
-          <div className="page-reveal glass-panel self-end p-5 text-hero-foreground [animation-delay:180ms] sm:p-6">
+          <div className="page-reveal glass-panel self-end rounded-2xl p-6 text-hero-foreground shadow-2xl [animation-delay:180ms]">
             <div className="flex items-center justify-between">
               <div>
                 <p className="font-mono text-[10px] uppercase tracking-widest text-hero-muted">
@@ -202,8 +202,8 @@ export function HomePage() {
                   73 <span className="text-base font-normal text-hero-muted">spaces</span>
                 </p>
               </div>
-              <div className="availability-ring grid size-20 place-items-center rounded-full">
-                <span className="font-mono text-sm">49%</span>
+              <div className="availability-ring grid size-20 place-items-center rounded-full shadow-inner">
+                <span className="font-mono text-sm font-semibold">49%</span>
               </div>
             </div>
             <div className="mt-5 grid grid-cols-3 gap-2 border-t border-hero-line pt-4">
@@ -219,7 +219,7 @@ export function HomePage() {
               ))}
             </div>
             <p className="mt-4 flex items-center gap-2 text-[10px] text-hero-muted">
-              <span className="live-dot" /> Updated just now
+              <span className="live-dot" /> Live sync · Updated just now
             </p>
           </div>
         </div>
@@ -258,7 +258,7 @@ export function HomePage() {
         <div className="mx-auto grid max-w-[1440px] gap-10 px-6 lg:grid-cols-[0.8fr_1.2fr] lg:px-10">
           <div>
             <SectionHeading
-              eyebrow="Live map · Floor 1"
+              eyebrow="Live map · BKC Hub"
               title="See where you'll park before you arrive."
               copy="Every bay reports its live state. Green spaces are ready now; choose one to begin your booking."
             />
@@ -277,29 +277,29 @@ export function HomePage() {
             <SectionHeading
               eyebrow="The facility"
               title="Designed for a calmer arrival."
-              copy="Three connected levels, smart guidance, and people on hand around the clock—built into one premium urban facility."
+              copy="Five connected levels, smart sensor guidance, and security on hand around the clock — built into one premium urban facility."
             />
-            <div className="grid grid-cols-2 gap-px border border-border bg-border">
+            <div className="overflow-hidden rounded-xl border border-border/80 bg-border/60 grid grid-cols-2 gap-px shadow-sm">
               {[
                 ["BKC, Mumbai", "Maharashtra"],
-                ["150 bays", "Across 3 floors"],
+                ["150 bays", "Across 5 levels"],
                 ["Open 24/7", "Mon–Sun"],
-                ["6 chargers", "60 kW fast charge"],
+                ["6 chargers", "60 kW high-speed"],
               ].map(([a, b]) => (
-                <div key={a} className="bg-background p-5">
+                <div key={a} className="bg-card p-5">
                   <strong className="block font-display text-xl">{a}</strong>
                   <span className="text-xs text-muted-foreground">{b}</span>
                 </div>
               ))}
             </div>
           </div>
-          <div className="mt-14 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="mt-14 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {facilities.map(([title, copy], i) => {
               const Icon = iconSet[i] ?? ShieldCheck;
               return (
                 <article
                   key={title}
-                  className="group interactive-lift border border-border bg-background p-5"
+                  className="group interactive-lift rounded-xl border border-border/80 bg-card p-6 shadow-sm transition-all duration-200 hover:border-primary/40 hover:-translate-y-0.5"
                 >
                   <Icon className="size-6 text-primary transition group-hover:scale-110" />
                   <h3 className="mt-6 font-display text-lg font-semibold">{title}</h3>
@@ -323,13 +323,13 @@ export function HomePage() {
             ].map((step, i) => (
               <div
                 key={step}
-                className="stagger-item relative border-t border-primary/40 pt-5"
+                className="stagger-item relative rounded-xl border border-border/70 bg-card/60 p-5 shadow-sm transition-all duration-200 hover:border-primary/40"
                 style={{ "--reveal-delay": `${i * 90}ms` } as React.CSSProperties}
               >
-                <span className="font-mono text-xs text-primary">0{i + 1}</span>
-                <h3 className="mt-4 max-w-[10rem] font-display text-xl font-semibold">{step}</h3>
+                <span className="font-mono text-xs font-semibold text-primary">0{i + 1}</span>
+                <h3 className="mt-4 font-display text-lg font-semibold">{step}</h3>
                 {i < 4 && (
-                  <ArrowRight className="absolute -right-3 top-[-9px] hidden size-4 text-primary md:block" />
+                  <ArrowRight className="absolute -right-3 top-1/2 -translate-y-1/2 hidden size-4 text-primary md:block z-10" />
                 )}
               </div>
             ))}
@@ -497,9 +497,12 @@ function ParkingBooking({ initialSlot }: { initialSlot: ParkingSlotData }) {
       title="Choose your bay"
       copy="Live availability across all five facility levels."
     >
-      <div className="mb-5 grid gap-3 border border-border bg-surface p-4 sm:grid-cols-3">
-        <label className="field-label">
-          Date
+      <div className="mb-6 grid gap-4 rounded-2xl border border-border/80 bg-surface/95 p-5 shadow-sm sm:grid-cols-3">
+        <label className="field-label flex flex-col gap-1.5">
+          <span className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+            <CalendarDays className="size-3.5 text-primary" />
+            Date
+          </span>
           <input
             required
             type="date"
@@ -512,18 +515,21 @@ function ParkingBooking({ initialSlot }: { initialSlot: ParkingSlotData }) {
                 setArrival(getNext15MinIstTime());
               }
             }}
-            className="field-input"
+            className="field-input rounded-xl"
           />
         </label>
-        <label className="field-label">
-          Arrival
+        <label className="field-label flex flex-col gap-1.5">
+          <span className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+            <Clock3 className="size-3.5 text-primary" />
+            Arrival Time (IST)
+          </span>
           <input
             required
             type="time"
             min={date === todayIst ? getNowIstTime() : undefined}
             value={arrival}
             onChange={(event) => setArrival(event.target.value)}
-            className="field-input"
+            className="field-input rounded-xl"
           />
           {isPastArrival && (
             <p className="mt-1 text-xs font-semibold text-destructive">
@@ -531,13 +537,16 @@ function ParkingBooking({ initialSlot }: { initialSlot: ParkingSlotData }) {
             </p>
           )}
         </label>
-        <label className="field-label">
-          Duration
+        <label className="field-label flex flex-col gap-1.5">
+          <span className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+            <RotateCw className="size-3.5 text-primary" />
+            Duration
+          </span>
           <select
             required
             value={duration}
             onChange={(event) => setDuration(Number(event.target.value))}
-            className="field-input"
+            className="field-input rounded-xl"
           >
             <option value={1}>1 hour</option>
             <option value={2}>2 hours</option>
@@ -546,7 +555,7 @@ function ParkingBooking({ initialSlot }: { initialSlot: ParkingSlotData }) {
           </select>
         </label>
       </div>
-      <div className="grid gap-5 xl:grid-cols-[1fr_360px]">
+      <div className="grid gap-6 xl:grid-cols-[1fr_360px]">
         <ParkingMap
           onSelection={updateSlot}
           onSlotsLoaded={handleSlotsLoaded}
@@ -555,7 +564,7 @@ function ParkingBooking({ initialSlot }: { initialSlot: ParkingSlotData }) {
           onLevelChange={setLevel}
         />
         <aside className="space-y-4">
-          <div key={selected.id} className="selection-pulse border border-border bg-surface p-5">
+          <div key={selected.id} className="selection-pulse rounded-2xl border border-border/80 bg-surface/95 p-6 shadow-sm">
             <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
               Selected bay
             </p>
@@ -572,7 +581,7 @@ function ParkingBooking({ initialSlot }: { initialSlot: ParkingSlotData }) {
               <InfoRow label="Level" value={`Level ${selected.levelCode ?? level}`} />
               <InfoRow
                 label="Zone"
-                value={selected.zone === "EV" ? "EV charging" : `Zone ${selected.zone}`}
+                value={selected.zone === "EV" ? "⚡ EV Charging" : `Zone ${selected.zone}`}
               />
               <InfoRow label="Vehicle" value={selected.type} />
               <InfoRow label="Rate" value={`₹${selected.price}/hour`} />
@@ -582,8 +591,8 @@ function ParkingBooking({ initialSlot }: { initialSlot: ParkingSlotData }) {
               />
             </dl>
           </div>
-          <div className="sticky top-24 border border-primary/30 bg-primary/5 p-5">
-            <p className="font-mono text-[10px] uppercase tracking-widest text-primary">
+          <div className="sticky top-24 rounded-2xl border border-primary/30 bg-primary/5 p-6 shadow-sm backdrop-blur-sm">
+            <p className="font-mono text-[10px] uppercase tracking-widest text-primary font-semibold">
               Booking summary
             </p>
             <div className="price-pop mt-5 space-y-3 text-sm" aria-live="polite">
@@ -594,16 +603,16 @@ function ParkingBooking({ initialSlot }: { initialSlot: ParkingSlotData }) {
               </div>
             </div>
             {valid ? (
-              <Button size="lg" className="mt-5 w-full" onClick={handleContinue}>
+              <Button size="lg" className="mt-6 w-full" onClick={handleContinue}>
                 Continue <ArrowRight className="transition-transform group-hover:translate-x-1" />
               </Button>
             ) : (
-              <Button size="lg" className="mt-5 w-full" disabled>
+              <Button size="lg" className="mt-6 w-full" disabled>
                 {!isSelectedAvailable ? "Bay unavailable" : "Complete booking details"}
               </Button>
             )}
             <p className="mt-3 flex items-center justify-center gap-1.5 text-[10px] text-muted-foreground">
-              <LockKeyhole className="size-3" /> Secure checkout
+              <LockKeyhole className="size-3" /> Secure instant checkout
             </p>
           </div>
         </aside>
@@ -850,9 +859,9 @@ export function VehiclesPage() {
       {!isLoading && !isError && (
         <>
           {vehicles.length === 0 ? (
-            <div className="border border-dashed border-border p-12 text-center bg-surface/30">
+            <div className="rounded-2xl border border-dashed border-border/80 bg-surface/40 p-12 text-center shadow-sm">
               <CarFront className="mx-auto size-12 text-muted-foreground/60" />
-              <h3 className="mt-4 font-display text-xl">No vehicles registered yet</h3>
+              <h3 className="mt-4 font-display text-xl font-semibold">No vehicles registered yet</h3>
               <p className="mt-2 text-sm text-muted-foreground max-w-md mx-auto">
                 Register your vehicle to automate bay selection, access EV chargers, and speed up
                 checkout.
@@ -879,41 +888,43 @@ export function VehiclesPage() {
                   <article
                     key={vehicle.id}
                     className={cn(
-                      "interactive-lift relative border bg-surface p-6 transition-all",
+                      "interactive-lift relative rounded-2xl border bg-surface/95 p-6 transition-all duration-200 shadow-sm",
                       isSelected
-                        ? "border-selected shadow-[0_0_24px_var(--selected-glow)]"
-                        : "border-border",
+                        ? "border-selected ring-2 ring-selected/40 shadow-[0_0_24px_var(--selected-glow)]"
+                        : "border-border/80 hover:border-primary/40",
                     )}
                   >
                     {vehicle.is_default && (
                       <div className="absolute right-4 top-4">
-                        <span className="inline-flex items-center gap-1 rounded bg-primary/10 px-2 py-0.5 text-[10px] font-semibold tracking-wider uppercase text-primary border border-primary/20">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-0.5 text-[10px] font-semibold tracking-wider uppercase text-primary border border-primary/20">
                           <Star className="size-3 fill-primary" /> Default
                         </span>
                       </div>
                     )}
 
                     {isEvVehicle ? (
-                      <Zap className="size-10 text-primary" />
+                      <Zap className="size-9 text-primary" />
                     ) : vehicle.vehicle_type === "bike" ? (
-                      <Bike className="size-10 text-primary" />
+                      <Bike className="size-9 text-primary" />
                     ) : (
-                      <CarFront className="size-10 text-primary" />
+                      <CarFront className="size-9 text-primary" />
                     )}
 
-                    <h2 className="mt-7 font-display text-2xl truncate" title={title}>
+                    <h2 className="mt-5 font-display text-xl font-bold truncate" title={title}>
                       {title}
                     </h2>
-                    <p className="mt-1 font-mono text-sm tracking-wider font-semibold">
-                      {vehicle.plate_number}
-                    </p>
-                    <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                    <div className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-border/80 bg-background/80 px-3 py-1 shadow-xs">
+                      <span className="font-mono text-xs font-bold uppercase tracking-wider text-foreground">
+                        {vehicle.plate_number}
+                      </span>
+                    </div>
+                    <div className="mt-2.5 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
                       <span className="capitalize">
                         {vehicle.vehicle_type === "ev" ? "EV" : vehicle.vehicle_type}
                       </span>
                       {vehicle.color && <span>• {vehicle.color}</span>}
                       {isEvVehicle && vehicle.connector_type && (
-                        <span className="text-primary font-mono text-[11px]">
+                        <span className="text-primary font-mono text-[11px] font-medium">
                           • {vehicle.connector_type}
                         </span>
                       )}
@@ -1460,34 +1471,34 @@ export function CheckoutPage() {
       <div className="grid gap-6 lg:grid-cols-[1fr_420px]">
         <div className="space-y-6">
           {/* Parking Details Card */}
-          <div className="border border-border bg-surface p-6">
-            <h2 className="font-display text-2xl">Parking details</h2>
-            <div className="mt-6 grid gap-px border border-border bg-border sm:grid-cols-2">
-              <div className="bg-surface p-4">
+          <div className="rounded-2xl border border-border/80 bg-surface/95 p-6 shadow-sm">
+            <h2 className="font-display text-2xl font-bold">Parking details</h2>
+            <div className="mt-6 overflow-hidden rounded-xl border border-border/80 bg-border/60 grid sm:grid-cols-2 gap-px shadow-xs">
+              <div className="bg-card p-4">
                 <span className="text-xs text-muted-foreground">Facility</span>
-                <strong className="mt-1 block text-sm">{facility.name}</strong>
+                <strong className="mt-1 block text-sm font-semibold">{facility.name}</strong>
               </div>
-              <div className="bg-surface p-4">
+              <div className="bg-card p-4">
                 <span className="text-xs text-muted-foreground">Slot & Level</span>
-                <strong className="mt-1 block text-sm">
+                <strong className="mt-1 block text-sm font-semibold text-primary">
                   {activeSlotCode} · Level {activeLevel}
                 </strong>
               </div>
-              <div className="bg-surface p-4">
+              <div className="bg-card p-4">
                 <span className="text-xs text-muted-foreground">Date</span>
-                <strong className="mt-1 block text-sm">{formatIstDate(activeStartAt)}</strong>
+                <strong className="mt-1 block text-sm font-semibold">{formatIstDate(activeStartAt)}</strong>
               </div>
-              <div className="bg-surface p-4">
+              <div className="bg-card p-4">
                 <span className="text-xs text-muted-foreground">Arrival Window</span>
-                <strong className="mt-1 block text-sm">
+                <strong className="mt-1 block text-sm font-semibold">
                   {formatIstTime(activeStartAt)} – {formatIstTime(activeEndAt)}
                 </strong>
               </div>
-              <div className="bg-surface p-4">
+              <div className="bg-card p-4">
                 <span className="text-xs text-muted-foreground">Duration</span>
-                <strong className="mt-1 block text-sm">{activeDuration} hours</strong>
+                <strong className="mt-1 block text-sm font-semibold">{activeDuration} hours</strong>
               </div>
-              <div className="bg-surface p-4">
+              <div className="bg-card p-4">
                 <span className="text-xs text-muted-foreground">Assigned Vehicle</span>
                 {vehicles.length > 0 ? (
                   <select
@@ -1511,23 +1522,22 @@ export function CheckoutPage() {
               </div>
             </div>
 
-            <div className="mt-6 flex items-center gap-3 border border-available/30 bg-available/5 p-4">
-              <ShieldCheck className="size-6 text-available" />
+            <div className="mt-6 flex items-center gap-3.5 rounded-xl border border-available/35 bg-available/10 p-4 shadow-xs">
+              <ShieldCheck className="size-6 text-available shrink-0" />
               <p className="text-sm">
-                <strong className="block">Your space is held</strong>
+                <strong className="block font-semibold text-foreground">Your space is securely held</strong>
                 <span className="text-muted-foreground">
-                  Hold timer: {holdMinutes}:{holdRemainderSecs.toString().padStart(2, "0")}{" "}
-                  remaining. Complete payment to confirm.
+                  Hold timer: <span className="font-mono font-semibold text-foreground">{holdMinutes}:{holdRemainderSecs.toString().padStart(2, "0")}</span> remaining. Complete payment to confirm reservation.
                 </span>
               </p>
             </div>
           </div>
 
           {/* Payment Method Selector */}
-          <div className="border border-border bg-surface p-6">
+          <div className="rounded-2xl border border-border/80 bg-surface/95 p-6 shadow-sm">
             <div className="flex items-center justify-between">
-              <h2 className="font-display text-2xl">Payment method</h2>
-              <span className="rounded-full bg-primary/10 px-2.5 py-0.5 font-mono text-[11px] font-semibold text-primary">
+              <h2 className="font-display text-2xl font-bold">Payment method</h2>
+              <span className="rounded-full bg-primary/10 px-2.5 py-0.5 font-mono text-[11px] font-semibold text-primary border border-primary/20">
                 Encrypted · 256-Bit
               </span>
             </div>
@@ -1535,7 +1545,7 @@ export function CheckoutPage() {
               Select how you would like to pay. No real credentials or PINs are stored.
             </p>
 
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
               {paymentMethods.map((m) => {
                 const isSelected = selectedMethod === m.id;
                 return (
@@ -1544,17 +1554,17 @@ export function CheckoutPage() {
                     type="button"
                     onClick={() => setSelectedMethod(m.id)}
                     className={cn(
-                      "flex items-start gap-3 rounded-lg border p-4 text-left transition-all",
+                      "flex items-start gap-3.5 rounded-xl border p-4 text-left transition-all duration-200",
                       isSelected
-                        ? "border-primary bg-primary/10 shadow-sm ring-1 ring-primary"
-                        : "border-border bg-surface/60 hover:border-border/80 hover:bg-surface",
+                        ? "border-primary bg-primary/10 shadow-sm ring-2 ring-primary/40"
+                        : "border-border/80 bg-card/60 hover:border-border hover:bg-card",
                     )}
                   >
                     <div
                       className={cn(
-                        "grid size-8 shrink-0 place-items-center rounded-md border text-xs font-bold",
+                        "grid size-9 shrink-0 place-items-center rounded-lg border text-xs font-bold transition-colors",
                         isSelected
-                          ? "border-primary bg-primary text-primary-foreground"
+                          ? "border-primary bg-primary text-primary-foreground shadow-sm"
                           : "border-border bg-background text-muted-foreground",
                       )}
                     >
@@ -1563,7 +1573,7 @@ export function CheckoutPage() {
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-semibold text-foreground">{m.name}</span>
-                        {isSelected && <Check className="size-3 text-primary" />}
+                        {isSelected && <Check className="size-3.5 text-primary" />}
                       </div>
                       <span className="mt-0.5 block text-[11px] text-muted-foreground">
                         {m.detail}
@@ -1575,7 +1585,7 @@ export function CheckoutPage() {
             </div>
 
             {/* Mock Gateway Test Scenario Tool */}
-            <div className="mt-6 rounded-lg border border-primary/30 bg-primary/5 p-4">
+            <div className="mt-6 rounded-xl border border-primary/30 bg-primary/5 p-5 shadow-xs">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Sparkles className="size-4 text-primary" />
@@ -1599,7 +1609,7 @@ export function CheckoutPage() {
                   value={testScenario}
                   onChange={(e) => setTestScenario(e.target.value as TestScenario)}
                   disabled={processing}
-                  className="mt-1.5 w-full rounded border border-border bg-background px-3 py-2 text-xs font-medium focus:border-primary focus:outline-none"
+                  className="mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2 text-xs font-medium focus:border-primary focus:outline-none"
                   aria-label="Payment test scenario"
                 >
                   <option value="success">
@@ -1617,8 +1627,8 @@ export function CheckoutPage() {
         </div>
 
         {/* Price Summary and Action */}
-        <div className="h-fit border border-primary/30 bg-primary/5 p-6">
-          <h2 className="font-display text-2xl">Price summary</h2>
+        <div className="sticky top-24 h-fit rounded-2xl border border-primary/30 bg-primary/5 p-6 shadow-sm backdrop-blur-sm">
+          <h2 className="font-display text-2xl font-bold">Price summary</h2>
           <div className="mt-6 space-y-4">
             <InfoRow label="Parking base" value={formatPaise(activeBasePaise)} />
             <InfoRow label="GST (18%)" value={formatPaise(activeTaxPaise)} />
@@ -1628,7 +1638,7 @@ export function CheckoutPage() {
           </div>
 
           {paymentError && (
-            <div className="mt-5 rounded border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive">
+            <div className="mt-5 rounded-xl border border-destructive/40 bg-destructive/10 p-3.5 text-xs text-destructive">
               <div className="flex items-center gap-2 font-semibold">
                 <AlertCircle className="size-4 shrink-0" />
                 <span>Payment Unsuccessful</span>
@@ -1653,12 +1663,12 @@ export function CheckoutPage() {
           ) : (
             <Button
               size="lg"
-              className="mt-7 w-full"
+              className="mt-7 w-full magnetic-cta"
               loading={processing}
               disabled={processing || vehiclesLoading || vehicles.length === 0}
               onClick={pay}
             >
-              <LockKeyhole />{" "}
+              <LockKeyhole className="mr-1.5 size-4" />{" "}
               {processing
                 ? "Authorizing with gateway..."
                 : attemptCount > 0
@@ -1666,6 +1676,21 @@ export function CheckoutPage() {
                   : `Pay ${formatPaise(activeTotalPaise)}`}
             </Button>
           )}
+
+          <div className="mt-5 space-y-2 border-t border-border/60 pt-4 text-[11px] text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <Check className="size-3.5 text-available shrink-0" />
+              <span>Instant QR pass generated upon payment</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Check className="size-3.5 text-available shrink-0" />
+              <span>Official GST Tax Invoice with input credit</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Check className="size-3.5 text-available shrink-0" />
+              <span>Free cancellation up to 30 mins prior to arrival</span>
+            </div>
+          </div>
 
           <div
             className="mt-4 space-y-1.5 text-center text-[10px] text-muted-foreground"
@@ -1828,13 +1853,13 @@ Status: CONFIRMED (PAID)`,
 
   return (
     <PageFrame eyebrow="Payment successful" title="Booking confirmed">
-      <div className="page-reveal mx-auto max-w-3xl border border-available/30 bg-surface p-6 text-center sm:p-10">
-        <span className="success-check mx-auto grid size-16 place-items-center rounded-full bg-available/12 text-available">
+      <div className="page-reveal mx-auto max-w-3xl rounded-3xl border border-available/30 bg-surface/95 p-6 text-center sm:p-10 shadow-2xl backdrop-blur-xl">
+        <span className="success-check mx-auto grid size-16 place-items-center rounded-full bg-available/15 text-available shadow-[0_0_24px_var(--available)]">
           <Check className="size-8" />
         </span>
         <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
           <p className="font-mono text-xs uppercase text-muted-foreground">
-            Booking Ref · {refCode}
+            Booking Ref · <span className="font-semibold text-foreground">{refCode}</span>
           </p>
           <Button
             size="icon-sm"
@@ -1843,16 +1868,16 @@ Status: CONFIRMED (PAID)`,
             onClick={copyId}
             success={copied}
           >
-            {!copied && <Copy />}
+            {!copied && <Copy className="size-3.5" />}
           </Button>
         </div>
-        <h2 className="mt-2 font-display text-5xl">{slotCode}</h2>
-        <p className="mt-2 text-muted-foreground">
-          {dateStr} · {timeStr} · Floor {levelCode}
+        <h2 className="mt-2 font-display text-5xl sm:text-6xl font-bold tracking-tight text-foreground">{slotCode}</h2>
+        <p className="mt-2 text-sm text-muted-foreground">
+          {dateStr} · {timeStr} · Level {levelCode}
         </p>
 
         {/* GST Tax Invoice & Receipt Summary */}
-        <div className="mt-6 rounded-lg border border-border bg-background/80 p-5 text-left text-xs">
+        <div className="mt-6 rounded-2xl border border-border/80 bg-card/80 p-5 text-left text-xs shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 pb-3">
             <div>
               <span className="font-mono text-[10px] uppercase text-muted-foreground">
@@ -1864,7 +1889,7 @@ Status: CONFIRMED (PAID)`,
               <span className="font-mono text-[10px] uppercase text-muted-foreground">
                 Payment Status
               </span>
-              <span className="flex items-center gap-1 font-mono text-xs font-semibold text-emerald-500">
+              <span className="flex items-center gap-1 font-mono text-xs font-semibold text-available">
                 <Check className="size-3" /> PAID · {providerRef}
               </span>
             </div>
@@ -1884,16 +1909,16 @@ Status: CONFIRMED (PAID)`,
             </div>
             <div className="flex justify-between border-t border-border/50 pt-2 font-semibold text-foreground">
               <span>Total Paid ({paymentMethod}):</span>
-              <span className="text-sm font-bold text-emerald-500">{formatPaise(totalAmount)}</span>
+              <span className="text-sm font-bold text-available">{formatPaise(totalAmount)}</span>
             </div>
           </div>
         </div>
 
-        <div className="qr-shell relative mx-auto mt-8 w-fit bg-qr p-5 text-qr-foreground">
+        <div className="qr-shell relative mx-auto mt-8 w-fit rounded-2xl bg-qr p-5 text-qr-foreground shadow-2xl ring-4 ring-border/50">
           <QRCodeSVG value={refCode} size={184} />
           <span className="qr-scan-line" />
         </div>
-        <p className="mt-4 text-xs text-muted-foreground">Scan at the entry gate</p>
+        <p className="mt-4 text-xs font-medium text-muted-foreground">Scan at the entry gate barrier for instant access</p>
         <div className="mt-8 flex flex-wrap justify-center gap-2">
           <Link to="/bookings">
             <Button>View my bookings</Button>
@@ -1912,7 +1937,7 @@ Status: CONFIRMED (PAID)`,
           <CarFront className="car-park-animation size-6 text-primary" />
           <span>Gate</span>
           <ArrowRight className="size-3" />
-          <span className="border border-selected/50 bg-selected/10 px-3 py-2 font-mono font-bold text-selected">
+          <span className="rounded-lg border border-selected/50 bg-selected/10 px-3.5 py-1.5 font-mono text-sm font-bold text-selected shadow-[0_0_12px_var(--selected-glow)]">
             {slotCode}
           </span>
         </div>
@@ -2357,12 +2382,12 @@ export function BookingsPage() {
             <ActiveSessionCard onSessionEnded={() => refetch()} />
 
             {isLoading ? (
-              <div className="flex min-h-64 flex-col items-center justify-center gap-2 border border-border/40 bg-surface/60 font-mono text-xs text-muted-foreground">
+              <div className="flex min-h-64 flex-col items-center justify-center gap-2 rounded-2xl border border-border/60 bg-surface/80 font-mono text-xs text-muted-foreground shadow-sm">
                 <span className="live-dot" />
                 <span>Loading active bookings...</span>
               </div>
             ) : bookings.length === 0 && !hasActiveSession ? (
-              <div className="grid min-h-72 place-items-center border border-dashed border-border bg-surface text-center">
+              <div className="grid min-h-72 place-items-center rounded-2xl border border-dashed border-border/80 bg-surface/60 p-8 text-center">
                 <div>
                   <CarFront className="mx-auto size-9 text-muted-foreground" />
                   <h2 className="mt-4 font-display text-2xl">No active bookings</h2>
@@ -2380,14 +2405,14 @@ export function BookingsPage() {
                   {bookings.map((b) => (
                     <article
                       key={b.id}
-                      className="interactive-lift grid gap-6 border border-border bg-surface p-6 lg:grid-cols-[1fr_auto]"
+                      className="interactive-lift grid gap-6 rounded-2xl border border-border/80 bg-surface/95 p-6 shadow-sm hover:border-border hover:shadow-md transition-all lg:grid-cols-[1fr_auto]"
                     >
                       <div>
                         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                           <StatusBadge status={b.status} />
                           <span
                             className={cn(
-                              "rounded-full px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider",
+                              "rounded-full px-2.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider",
                               b.payment_status === "paid" &&
                                 "border border-emerald-500/30 bg-emerald-500/10 text-emerald-500",
                               b.payment_status === "refunded" &&
@@ -2445,12 +2470,12 @@ export function BookingsPage() {
             )}
           </div>
         ) : isLoading ? (
-          <div className="flex min-h-64 flex-col items-center justify-center gap-2 border border-border/40 bg-surface/60 font-mono text-xs text-muted-foreground">
+          <div className="flex min-h-64 flex-col items-center justify-center gap-2 rounded-2xl border border-border/60 bg-surface/80 font-mono text-xs text-muted-foreground shadow-sm">
             <span className="live-dot" />
             <span>Loading {tab.toLowerCase()} bookings...</span>
           </div>
         ) : bookings.length === 0 ? (
-          <div className="grid min-h-72 place-items-center border border-dashed border-border bg-surface text-center">
+          <div className="grid min-h-72 place-items-center rounded-2xl border border-dashed border-border/80 bg-surface/60 p-8 text-center">
             <div>
               <CarFront className="mx-auto size-9 text-muted-foreground" />
               <h2 className="mt-4 font-display text-2xl">No {tab.toLowerCase()} bookings</h2>
@@ -2467,14 +2492,14 @@ export function BookingsPage() {
             {bookings.map((b) => (
               <article
                 key={b.id}
-                className="interactive-lift grid gap-6 border border-border bg-surface p-6 lg:grid-cols-[1fr_auto]"
+                className="interactive-lift grid gap-6 rounded-2xl border border-border/80 bg-surface/95 p-6 shadow-sm hover:border-border hover:shadow-md transition-all lg:grid-cols-[1fr_auto]"
               >
                 <div>
                   <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                     <StatusBadge status={b.status} />
                     <span
                       className={cn(
-                        "rounded-full px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider",
+                        "rounded-full px-2.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider",
                         b.payment_status === "paid" &&
                           "border border-emerald-500/30 bg-emerald-500/10 text-emerald-500",
                         b.payment_status === "refunded" &&
@@ -2628,7 +2653,7 @@ export function EVPage() {
   ];
   return (
     <PageFrame eyebrow="Charge while you park" title="EV charging">
-      <div className="mb-8 grid gap-6 border border-ev/30 bg-ev/5 p-7 lg:grid-cols-2">
+      <div className="mb-8 grid gap-6 rounded-2xl border border-ev/30 bg-ev/5 p-7 shadow-sm lg:grid-cols-2">
         <div>
           <BatteryCharging className="size-10 text-ev" />
           <h2 className="mt-5 font-display text-3xl">Fast, monitored charging</h2>
@@ -2644,20 +2669,23 @@ export function EVPage() {
       </div>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {chargers.map((c) => (
-          <article key={c.id} className="border border-border bg-surface p-5">
-            <div className="flex justify-between">
+          <article
+            key={c.id}
+            className="interactive-lift rounded-2xl border border-border/80 bg-surface/90 p-6 shadow-sm transition-all hover:border-ev/40"
+          >
+            <div className="flex justify-between items-center">
               <Zap className="size-6 text-ev" />
               <StatusBadge
                 status={c.status as "available" | "occupied" | "reserved" | "maintenance"}
               />
             </div>
             <p className="mt-8 font-mono text-xs text-muted-foreground">EV CHARGER</p>
-            <h2 className="font-display text-3xl">{c.id}</h2>
+            <h2 className="font-display text-3xl font-bold">{c.id}</h2>
             <div className="mt-5 flex justify-between text-sm">
-              <span>CCS</span>
+              <span className="text-muted-foreground">Connector: CCS2</span>
               <strong>{c.power}</strong>
             </div>
-            <p className="mt-2 text-xs text-muted-foreground">₹12/kWh</p>
+            <p className="mt-2 text-xs font-mono text-muted-foreground">Tariff: ₹12/kWh</p>
             <Link to="/parking">
               <Button className="mt-6 w-full" disabled={c.status !== "available"}>
                 Book charger
@@ -2688,12 +2716,12 @@ export function InformationPage() {
       title="Parking information"
       copy="Clear answers for a smooth visit to ParkGrid One."
     >
-      <div className="max-w-4xl divide-y divide-border border-y border-border">
+      <div className="max-w-4xl divide-y divide-border/60 rounded-2xl border border-border/80 bg-surface/80 p-6 shadow-sm">
         {items.map((item, i) => (
-          <details key={item} className="group py-5">
-            <summary className="flex cursor-pointer list-none items-center justify-between font-display text-xl">
+          <details key={item} className="group py-5 first:pt-2 last:pb-2">
+            <summary className="flex cursor-pointer list-none items-center justify-between font-display text-xl transition-colors hover:text-primary">
               <span>{item}</span>
-              <ChevronDown className="size-5 transition group-open:rotate-180" />
+              <ChevronDown className="size-5 transition group-open:rotate-180 text-muted-foreground group-hover:text-primary" />
             </summary>
             <p className="mt-4 max-w-2xl text-sm leading-7 text-muted-foreground">
               {i === 0
@@ -2717,16 +2745,17 @@ export function LocationPage() {
       copy="Inside Bandra Kurla Complex, with separate entry and exit lanes."
     >
       <div className="grid gap-6 lg:grid-cols-[1.15fr_.85fr]">
-        <div className="location-map relative min-h-[480px] overflow-hidden border border-border bg-surface">
-          <div className="absolute left-[18%] top-[18%] border border-primary/40 bg-background p-3 shadow-xl">
-            <span className="font-mono text-[10px] uppercase text-primary">Entrance</span>
+        <div className="location-map relative min-h-[480px] overflow-hidden rounded-2xl border border-border/80 bg-surface shadow-sm">
+          <div className="absolute left-[18%] top-[18%] rounded-full border border-primary/40 bg-background/95 px-3 py-1 shadow-lg backdrop-blur">
+            <span className="font-mono text-[10px] font-semibold uppercase tracking-wider text-primary">Entrance Lane</span>
           </div>
-          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 border border-selected bg-selected/10 p-8 text-center">
-            <CarFront className="mx-auto size-8 text-selected" />
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-selected/40 bg-background/90 p-8 text-center shadow-2xl backdrop-blur-md">
+            <CarFront className="mx-auto size-9 text-selected" />
             <strong className="mt-2 block font-display text-2xl">ParkGrid One</strong>
+            <span className="font-mono text-xs text-muted-foreground">G-Block, BKC</span>
           </div>
-          <div className="absolute bottom-[15%] right-[18%] border border-available/40 bg-background p-3 shadow-xl">
-            <span className="font-mono text-[10px] uppercase text-available">Exit</span>
+          <div className="absolute bottom-[15%] right-[18%] rounded-full border border-available/40 bg-background/95 px-3 py-1 shadow-lg backdrop-blur">
+            <span className="font-mono text-[10px] font-semibold uppercase tracking-wider text-available">Exit Barrier</span>
           </div>
         </div>
         <div className="space-y-4">
@@ -3026,8 +3055,8 @@ export function ProfilePage() {
         </aside>
 
         {activeTab === "Payment methods" ? (
-          <div className="border border-border bg-surface p-6">
-            <div className="flex items-center justify-between">
+          <div className="rounded-2xl border border-border/80 bg-surface/95 p-6 sm:p-8 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
                 <h2 className="font-display text-2xl">Payment methods</h2>
                 <p className="text-xs text-muted-foreground mt-1">
@@ -3039,7 +3068,7 @@ export function ProfilePage() {
               </span>
             </div>
 
-            <div className="mt-6 flex items-start gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4 text-xs text-muted-foreground">
+            <div className="mt-6 flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 text-xs text-muted-foreground">
               <ShieldCheck className="size-5 shrink-0 text-amber-500 mt-0.5" />
               <div>
                 <strong className="block text-foreground font-medium">
@@ -3053,9 +3082,9 @@ export function ProfilePage() {
             </div>
 
             <div className="mt-6 space-y-3">
-              <div className="flex items-center justify-between rounded-lg border border-border bg-background p-4">
+              <div className="flex items-center justify-between rounded-xl border border-border/80 bg-background/90 p-4 shadow-xs">
                 <div className="flex items-center gap-3">
-                  <div className="grid size-10 place-items-center rounded bg-primary/10 text-primary">
+                  <div className="grid size-10 place-items-center rounded-lg bg-primary/10 text-primary">
                     <CreditCard className="size-5" />
                   </div>
                   <div>
@@ -3067,14 +3096,14 @@ export function ProfilePage() {
                     </span>
                   </div>
                 </div>
-                <span className="rounded border border-primary/30 bg-primary/10 px-2 py-0.5 font-mono text-[10px] font-semibold text-primary">
+                <span className="rounded-full border border-primary/30 bg-primary/10 px-2.5 py-0.5 font-mono text-[10px] font-semibold text-primary">
                   Default
                 </span>
               </div>
 
-              <div className="flex items-center justify-between rounded-lg border border-border bg-background p-4">
+              <div className="flex items-center justify-between rounded-xl border border-border/80 bg-background/90 p-4 shadow-xs">
                 <div className="flex items-center gap-3">
-                  <div className="grid size-10 place-items-center rounded bg-muted/30 text-muted-foreground">
+                  <div className="grid size-10 place-items-center rounded-lg bg-muted/30 text-muted-foreground">
                     <Sparkles className="size-5" />
                   </div>
                   <div>
@@ -3085,9 +3114,9 @@ export function ProfilePage() {
                 <span className="font-mono text-xs text-muted-foreground">Active</span>
               </div>
 
-              <div className="flex items-center justify-between rounded-lg border border-border bg-background p-4">
+              <div className="flex items-center justify-between rounded-xl border border-border/80 bg-background/90 p-4 shadow-xs">
                 <div className="flex items-center gap-3">
-                  <div className="grid size-10 place-items-center rounded bg-muted/30 text-muted-foreground">
+                  <div className="grid size-10 place-items-center rounded-lg bg-muted/30 text-muted-foreground">
                     <CreditCard className="size-5" />
                   </div>
                   <div>
@@ -3114,13 +3143,13 @@ export function ProfilePage() {
             </Button>
           </div>
         ) : (
-          <div className="border border-border bg-surface p-6">
+          <div className="rounded-2xl border border-border/80 bg-surface/95 p-6 sm:p-8 shadow-sm">
             <div className="flex items-center gap-4">
-              <span className="grid size-16 place-items-center rounded-full bg-primary/10 font-display text-xl text-primary">
+              <span className="grid size-16 place-items-center rounded-full bg-primary/10 font-display text-xl font-bold text-primary border border-primary/20 shadow-[0_0_15px_var(--primary-glow)]">
                 BD
               </span>
               <div>
-                <h2 className="font-display text-2xl">Bhushan Dhavale</h2>
+                <h2 className="font-display text-2xl font-bold">Bhushan Dhavale</h2>
                 <p className="text-sm text-muted-foreground">Member since September 2026</p>
               </div>
             </div>
@@ -3143,7 +3172,7 @@ export function ProfilePage() {
               </label>
             </div>
             <Button className="mt-6">Save changes</Button>
-            <div className="mt-10 border-t border-border pt-8">
+            <div className="mt-10 border-t border-border/60 pt-8">
               <div className="mb-4">
                 <h3 className="font-display text-xl font-semibold">Theme & Appearance</h3>
                 <p className="text-xs text-muted-foreground">
@@ -3235,10 +3264,15 @@ export function AdminPage() {
     >
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {stats.map(([label, value, StatIcon]) => (
-          <div key={label} className="border border-border bg-surface p-5">
-            <StatIcon className="size-5 text-primary" />
-            <strong className="mt-5 block font-display text-3xl">{value}</strong>
-            <span className="text-xs text-muted-foreground">{label}</span>
+          <div
+            key={label}
+            className="interactive-lift rounded-2xl border border-border/80 bg-surface/95 p-5 shadow-sm transition-all hover:border-primary/30 hover:shadow-md"
+          >
+            <div className="grid size-8 place-items-center rounded-lg bg-primary/10 text-primary">
+              <StatIcon className="size-4" />
+            </div>
+            <strong className="mt-5 block font-display text-3xl font-bold">{value}</strong>
+            <span className="mt-1 block text-xs text-muted-foreground">{label}</span>
           </div>
         ))}
       </div>
@@ -3248,14 +3282,14 @@ export function AdminPage() {
           <ParkingMap />
         </div>
         <div>
-          <h2 className="mb-4 font-display text-2xl">Recent bookings</h2>
-          <div className="divide-y divide-border border border-border bg-surface">
+          <h2 className="mb-4 font-display text-2xl font-semibold">Recent bookings</h2>
+          <div className="divide-y divide-border/60 rounded-2xl border border-border/80 bg-surface/95 shadow-sm overflow-hidden">
             {["SP-10231 · A12", "SP-10230 · E04", "SP-10229 · B16", "SP-10228 · A08"].map(
               (b, i) => (
-                <div key={b} className="flex items-center justify-between p-4">
+                <div key={b} className="flex items-center justify-between p-4 transition-colors hover:bg-muted/20">
                   <div>
-                    <strong className="text-sm">{b}</strong>
-                    <p className="text-xs text-muted-foreground">
+                    <strong className="font-mono text-sm">{b}</strong>
+                    <p className="text-xs text-muted-foreground mt-0.5">
                       {i + 9}:0{i} AM · ₹{118 + i * 20}
                     </p>
                   </div>
@@ -3532,17 +3566,20 @@ export function NotificationsPage() {
   ] as const;
   return (
     <PageFrame eyebrow="Updates" title="Notifications">
-      <div className="max-w-4xl divide-y divide-border border border-border bg-surface">
+      <div className="max-w-4xl divide-y divide-border/60 rounded-2xl border border-border/80 bg-surface/95 shadow-sm overflow-hidden">
         {rows.map(([title, copy, time, NoticeIcon]) => (
-          <div key={title} className="flex gap-4 p-5">
-            <span className="grid size-10 shrink-0 place-items-center rounded-full bg-primary/10 text-primary">
-              <NoticeIcon />
+          <div
+            key={title}
+            className="flex gap-4 p-5 transition-colors hover:bg-muted/20"
+          >
+            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary border border-primary/20 shadow-sm">
+              <NoticeIcon className="size-4" />
             </span>
-            <div className="flex-1">
-              <strong className="text-sm">{title}</strong>
-              <p className="mt-1 text-sm text-muted-foreground">{copy}</p>
+            <div className="flex-1 min-w-0">
+              <strong className="block text-sm font-semibold">{title}</strong>
+              <p className="mt-0.5 text-sm text-muted-foreground leading-relaxed">{copy}</p>
             </div>
-            <time className="text-[11px] text-muted-foreground">{time}</time>
+            <time className="shrink-0 font-mono text-[11px] text-muted-foreground pt-0.5">{time}</time>
           </div>
         ))}
       </div>
@@ -3597,8 +3634,10 @@ function InfoPanel({
   copy: string;
 }) {
   return (
-    <div className="flex gap-4 border border-border bg-surface p-5">
-      <Icon className="size-5 shrink-0 text-primary" />
+    <div className="flex gap-4 rounded-2xl border border-border/80 bg-surface/95 p-5 shadow-sm">
+      <div className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary border border-primary/20">
+        <Icon className="size-4" />
+      </div>
       <div>
         <h2 className="font-semibold">{title}</h2>
         <p className="mt-1 text-sm leading-6 text-muted-foreground">{copy}</p>
