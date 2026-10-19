@@ -117,7 +117,7 @@ export const payBooking = createServerFn({ method: "POST" })
       if (msg.includes("not found")) {
         throw new Error("Booking not found. Please select a space again.");
       }
-      throw new Error("Payment processing failed. Please try again.");
+      throw new Error(msg || "Payment processing failed. Please try again.");
     }
   });
 

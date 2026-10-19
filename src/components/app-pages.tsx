@@ -16,6 +16,8 @@ import {
   CarFront,
   Check,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   CircleGauge,
   Clock3,
   CreditCard,
@@ -38,6 +40,8 @@ import {
   SquareParking,
   Sparkles,
   Star,
+  StopCircle,
+  AlertTriangle,
   Trash2,
   UploadCloud,
   WalletCards,
@@ -117,6 +121,13 @@ import {
   type BookingStatus,
 } from "@/hooks/useBookings";
 import { usePayBooking, useGetReceipt, type PaymentRow } from "@/hooks/usePayments";
+import {
+  useActiveSession,
+  useEndSession,
+  useListMySessions,
+  type ActiveSessionData,
+  type MySessionRow,
+} from "@/hooks/useSessions";
 import type { PaymentMethod, TestScenario } from "@/lib/payments/provider";
 import {
   createIstDateTime,
@@ -1910,9 +1921,344 @@ Status: CONFIRMED (PAID)`,
   );
 }
 
+export function ActiveSessionCard({
+  bookingId,
+  onSessionEnded,
+}: {
+  bookingId?: string | null;
+  onSessionEnded?: () => void;
+}) {
+  const { data: activeSession, isLoading, refetch } = useActiveSession(bookingId);
+  const endMutation = useEndSession();
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-36 flex-col items-center justify-center gap-2 border border-border/40 bg-surface/60 font-mono text-xs text-muted-foreground p-6">
+        <span className="live-dot" />
+        <span>Loading parking session...</span>
+      </div>
+    );
+  }
+
+  if (!activeSession) {
+    return null;
+  }
+
+  const startedMs = new Date(activeSession.startedAt).getTime();
+  const bookedEndMs = new Date(activeSession.bookedEndAt).getTime();
+  const elapsedSec = Math.max(0, Math.floor((now - startedMs) / 1000));
+  const remainingSec = Math.floor((bookedEndMs - now) / 1000);
+  const isOverstay = remainingSec < 0;
+  const overstayGraceSec = 15 * 60; // 15-minute grace period
+  const pastGraceSec = Math.max(0, -remainingSec - overstayGraceSec);
+
+  const formatHMS = (secs: number) => {
+    const s = Math.max(0, secs);
+    const hours = Math.floor(s / 3600);
+    const mins = Math.floor((s % 3600) / 60);
+    const secsRem = s % 60;
+    return `${hours.toString().padStart(2, "0")}:${mins.toString().padStart(2, "0")}:${secsRem.toString().padStart(2, "0")}`;
+  };
+
+  const handleEndSession = async () => {
+    try {
+      const res = await endMutation.mutateAsync({ sessionId: activeSession.sessionId });
+      toast.success(
+        res.overstayTotalPaise > 0
+          ? `Parking ended. Overstay charge: ${formatPaise(res.overstayTotalPaise)}.`
+          : "Parking session ended successfully.",
+      );
+      setConfirmOpen(false);
+      refetch();
+      onSessionEnded?.();
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to end parking session");
+    }
+  };
+
+  return (
+    <div className="border border-selected/40 bg-selected/5 p-6 sm:p-8 space-y-6">
+      {/* Top Status Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/40 pb-4">
+        <div className="flex items-center gap-2.5">
+          <span className="live-dot" />
+          <span className="font-mono text-xs font-semibold uppercase tracking-wider text-emerald-400">
+            Active Parking Session
+          </span>
+        </div>
+        <span className="font-mono text-xs text-muted-foreground">
+          Session ID: {activeSession.sessionId.slice(0, 8)}...
+        </span>
+      </div>
+
+      {/* Main Clock & Elapsed Section */}
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 items-center">
+        <div>
+          <span className="font-mono text-xs uppercase text-muted-foreground">
+            {isOverstay ? "Time Past Scheduled End" : "Time Remaining"}
+          </span>
+          <p
+            className={cn(
+              "font-display text-5xl sm:text-6xl font-bold tracking-tight tabular-nums",
+              isOverstay ? "text-amber-400" : "text-foreground",
+            )}
+          >
+            {isOverstay ? `+${formatHMS(-remainingSec)}` : formatHMS(remainingSec)}
+          </p>
+          <p className="mt-1 font-mono text-xs text-muted-foreground">
+            {isOverstay
+              ? "Exceeded scheduled departure window"
+              : `Ends at ${formatIstTime(activeSession.bookedEndAt)}`}
+          </p>
+        </div>
+
+        <div>
+          <span className="font-mono text-xs uppercase text-muted-foreground">
+            Elapsed Duration
+          </span>
+          <p className="font-display text-4xl sm:text-5xl font-semibold tracking-tight text-foreground tabular-nums">
+            {formatHMS(elapsedSec)}
+          </p>
+          <p className="mt-1 font-mono text-xs text-muted-foreground">
+            Started at {formatIstTime(activeSession.startedAt)}
+          </p>
+        </div>
+
+        <div className="flex sm:justify-end">
+          <Button
+            size="lg"
+            variant="destructive"
+            className="w-full sm:w-auto font-mono text-xs uppercase tracking-wider font-bold gap-2"
+            onClick={() => setConfirmOpen(true)}
+            disabled={endMutation.isPending}
+          >
+            <StopCircle className="size-4" />
+            End Parking
+          </Button>
+        </div>
+      </div>
+
+      {/* Overstay Warning Banner */}
+      {isOverstay && (
+        <div
+          className={cn(
+            "rounded-lg border p-4 text-xs space-y-1.5",
+            pastGraceSec > 0
+              ? "border-rose-500/40 bg-rose-500/10 text-rose-300"
+              : "border-amber-500/40 bg-amber-500/10 text-amber-300",
+          )}
+        >
+          <div className="flex items-center gap-2 font-semibold">
+            <AlertTriangle className="size-4 shrink-0" />
+            <span>
+              {pastGraceSec > 0
+                ? "Overstay in Progress — Charges Apply"
+                : "Grace Period Active (15 Minutes)"}
+            </span>
+          </div>
+          <p className="text-muted-foreground text-[11px] leading-relaxed">
+            {pastGraceSec > 0
+              ? `You have exceeded the 15-minute exit grace period by ${Math.ceil(pastGraceSec / 60)} minutes. Overstay is charged prorated per minute plus GST. Est. running overstay: ${formatPaise(activeSession.overstayPaiseSoFar)}.`
+              : `Your booked time ended ${Math.ceil(-remainingSec / 60)} minutes ago. You have ${Math.ceil((overstayGraceSec - -remainingSec) / 60)} minutes of grace remaining. Please click "End Parking" before the grace period expires to avoid overstay charges.`}
+          </p>
+        </div>
+      )}
+
+      {/* Confirmation Dialog */}
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>End parking session?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 text-xs text-muted-foreground text-left">
+                <p>
+                  You are about to end your active parking session. Your departure time will be
+                  recorded immediately.
+                </p>
+                {isOverstay && pastGraceSec > 0 && (
+                  <div className="rounded border border-amber-500/30 bg-amber-500/10 p-2.5 text-amber-300">
+                    <strong>Overstay Notice:</strong> You parked beyond the grace period. An
+                    overstay charge of approximately{" "}
+                    <strong>{formatPaise(activeSession.overstayPaiseSoFar)}</strong> will be
+                    recorded and marked paid via mock gateway.
+                  </div>
+                )}
+                {isOverstay && pastGraceSec === 0 && (
+                  <div className="rounded border border-emerald-500/30 bg-emerald-500/10 p-2.5 text-emerald-400">
+                    <strong>Grace Period:</strong> You ended within the 15-minute grace window. No
+                    overstay fee will be charged!
+                  </div>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={endMutation.isPending}>Keep Parking</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                handleEndSession();
+              }}
+              disabled={endMutation.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {endMutation.isPending ? "Ending..." : "Confirm & End Parking"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
+export function SessionHistorySection() {
+  const [page, setPage] = useState(1);
+  const { data, isLoading, isError, refetch } = useListMySessions(null, page, 10);
+  const sessions = data?.sessions ?? [];
+  const totalCount = data?.totalCount ?? 0;
+  const totalPages = data?.totalPages ?? 1;
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-64 flex-col items-center justify-center gap-2 border border-border/40 bg-surface/60 font-mono text-xs text-muted-foreground">
+        <span className="live-dot" />
+        <span>Loading session history...</span>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="p-8 text-center text-xs border border-border bg-surface">
+        <AlertCircle className="size-8 mx-auto mb-2 text-destructive" />
+        <p className="text-foreground font-semibold">Failed to load session history.</p>
+        <Button size="sm" variant="outline" onClick={() => refetch()} className="mt-4 text-xs">
+          Try again
+        </Button>
+      </div>
+    );
+  }
+
+  if (sessions.length === 0) {
+    return (
+      <div className="grid min-h-72 place-items-center border border-dashed border-border bg-surface text-center">
+        <div>
+          <CarFront className="mx-auto size-9 text-muted-foreground" />
+          <h2 className="mt-4 font-display text-2xl">No session history</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Completed and ended parking sessions will appear here.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-xl border border-border bg-surface overflow-hidden shadow-sm">
+        <div className="overflow-x-auto min-w-full">
+          <table className="w-full text-xs">
+            <thead className="bg-surface/80 border-b border-border">
+              <tr className="text-left font-mono text-muted-foreground">
+                <th className="p-3">Reference / Bay</th>
+                <th className="p-3">Plate</th>
+                <th className="p-3">Started</th>
+                <th className="p-3">Ended</th>
+                <th className="p-3">Duration</th>
+                <th className="p-3">Status</th>
+                <th className="p-3 text-right">Overstay Fee</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sessions.map((s) => (
+                <tr
+                  key={s.sessionId}
+                  className="border-b border-border/60 hover:bg-accent/40 font-mono"
+                >
+                  <td className="p-3 font-semibold text-foreground">
+                    <div>{s.bookingReference}</div>
+                    <span className="text-[10px] text-muted-foreground font-normal">
+                      Bay {s.slotCode} (Lvl {s.levelCode})
+                    </span>
+                  </td>
+                  <td className="p-3">{s.plateSnapshot}</td>
+                  <td className="p-3 text-muted-foreground">{formatIstDateTime(s.startedAt)}</td>
+                  <td className="p-3 text-muted-foreground">
+                    {s.endedAt ? formatIstDateTime(s.endedAt) : "— Active —"}
+                  </td>
+                  <td className="p-3 tabular-nums">
+                    {s.durationMinutes != null
+                      ? `${Math.floor(s.durationMinutes / 60)}h ${s.durationMinutes % 60}m`
+                      : "—"}
+                  </td>
+                  <td className="p-3">
+                    <StatusBadge status={s.status} />
+                  </td>
+                  <td className="p-3 text-right font-bold tabular-nums">
+                    {s.overstayTotalPaise > 0 ? (
+                      <span className="text-amber-400">{formatPaise(s.overstayTotalPaise)}</span>
+                    ) : (
+                      <span className="text-muted-foreground font-normal">₹0</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination Footer */}
+        <div className="border-t border-border/60 px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted-foreground font-mono">
+          <div>
+            Showing <strong className="text-foreground tabular-nums">{sessions.length}</strong> of{" "}
+            <strong className="text-foreground tabular-nums">{totalCount}</strong> sessions
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] tabular-nums">
+              Page {page} of {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="icon"
+              className="size-7"
+              disabled={page <= 1 || isLoading}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              aria-label="Previous page"
+            >
+              <ChevronLeft className="size-3.5" />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              className="size-7"
+              disabled={page >= totalPages || isLoading}
+              onClick={() => setPage((p) => p + 1)}
+              aria-label="Next page"
+            >
+              <ChevronRight className="size-3.5" />
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function BookingsPage() {
-  const [tab, setTab] = useState<"Upcoming" | "Active" | "Completed" | "Cancelled">("Upcoming");
-  const tabs = ["Upcoming", "Active", "Completed", "Cancelled"] as const;
+  const [tab, setTab] = useState<
+    "Upcoming" | "Active" | "Completed" | "Cancelled" | "Session History"
+  >("Upcoming");
+  const tabs = ["Upcoming", "Active", "Completed", "Cancelled", "Session History"] as const;
+
+  const { data: activeSessionData } = useActiveSession();
+  const hasActiveSession = Boolean(activeSessionData?.isActive);
 
   const mappedStatus = useMemo(() => {
     switch (tab) {
@@ -1924,10 +2270,14 @@ export function BookingsPage() {
         return "completed" as BookingStatus;
       case "Cancelled":
         return "cancelled" as BookingStatus;
+      default:
+        return "confirmed" as BookingStatus;
     }
   }, [tab]);
 
-  const { data, isLoading, refetch } = useListMyBookings(tab);
+  const { data, isLoading, refetch } = useListMyBookings(
+    tab === "Session History" ? "Completed" : tab,
+  );
   const bookings = data?.bookings ?? [];
 
   // Cancellation modal state
@@ -1958,6 +2308,24 @@ export function BookingsPage() {
 
   return (
     <PageFrame eyebrow="Your parking" title="My bookings">
+      {/* Top Banner when session is currently active */}
+      {hasActiveSession && tab !== "Active" && (
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-xs">
+          <div className="flex items-center gap-2">
+            <span className="live-dot" />
+            <span className="font-medium text-emerald-400">Active parking session in progress</span>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 text-xs border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/20"
+            onClick={() => setTab("Active")}
+          >
+            View Live Session
+          </Button>
+        </div>
+      )}
+
       <div
         className="relative mb-6 flex gap-1 overflow-x-auto border-b border-border"
         role="tablist"
@@ -1980,8 +2348,103 @@ export function BookingsPage() {
           </Button>
         ))}
       </div>
+
       <div id="booking-panel" role="tabpanel" key={tab} className="page-reveal">
-        {isLoading ? (
+        {tab === "Session History" ? (
+          <SessionHistorySection />
+        ) : tab === "Active" ? (
+          <div className="space-y-6">
+            <ActiveSessionCard onSessionEnded={() => refetch()} />
+
+            {isLoading ? (
+              <div className="flex min-h-64 flex-col items-center justify-center gap-2 border border-border/40 bg-surface/60 font-mono text-xs text-muted-foreground">
+                <span className="live-dot" />
+                <span>Loading active bookings...</span>
+              </div>
+            ) : bookings.length === 0 && !hasActiveSession ? (
+              <div className="grid min-h-72 place-items-center border border-dashed border-border bg-surface text-center">
+                <div>
+                  <CarFront className="mx-auto size-9 text-muted-foreground" />
+                  <h2 className="mt-4 font-display text-2xl">No active bookings</h2>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Your active parking sessions will appear here.
+                  </p>
+                  <Link to="/parking" className="mt-5 inline-block">
+                    <Button>Book parking</Button>
+                  </Link>
+                </div>
+              </div>
+            ) : (
+              bookings.length > 0 && (
+                <div className="space-y-4">
+                  {bookings.map((b) => (
+                    <article
+                      key={b.id}
+                      className="interactive-lift grid gap-6 border border-border bg-surface p-6 lg:grid-cols-[1fr_auto]"
+                    >
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                          <StatusBadge status={b.status} />
+                          <span
+                            className={cn(
+                              "rounded-full px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider",
+                              b.payment_status === "paid" &&
+                                "border border-emerald-500/30 bg-emerald-500/10 text-emerald-500",
+                              b.payment_status === "refunded" &&
+                                "border border-blue-500/30 bg-blue-500/10 text-blue-500",
+                              b.payment_status === "partially_refunded" &&
+                                "border border-amber-500/30 bg-amber-500/10 text-amber-500",
+                              b.payment_status === "failed" &&
+                                "border border-rose-500/30 bg-rose-500/10 text-rose-500",
+                              b.payment_status === "pending" &&
+                                "border border-border bg-muted/20 text-muted-foreground",
+                            )}
+                          >
+                            Payment: {b.payment_status.replace("_", " ")}
+                          </span>
+                          <span className="font-mono text-xs text-muted-foreground">
+                            {b.reference}
+                          </span>
+                        </div>
+                        <div className="mt-5 flex items-end gap-4">
+                          <strong className="font-display text-4xl sm:text-5xl">
+                            {b.parking_slots?.code || "Bay"}
+                          </strong>
+                          <span className="mb-1 text-sm text-muted-foreground">
+                            Level {b.parking_slots?.level_code || "—"} ·{" "}
+                            {b.plate_snapshot || b.vehicles?.plate_number || "—"}
+                          </span>
+                        </div>
+                        <div className="mt-5 flex flex-wrap gap-x-8 gap-y-3 text-sm">
+                          <span>{formatIstDateTime(b.start_at)}</span>
+                          <span className="font-mono font-medium">
+                            {b.plate_snapshot || b.vehicles?.plate_number || "—"}
+                          </span>
+                          <span className="font-semibold text-foreground">
+                            {formatPaise(b.total_paise)}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Link
+                          to="/confirmation"
+                          onClick={() => {
+                            if (typeof window !== "undefined") {
+                              sessionStorage.setItem("parkgrid_last_booking_id", b.id);
+                              sessionStorage.setItem("parkgrid_last_booking", JSON.stringify(b));
+                            }
+                          }}
+                        >
+                          <Button>QR Pass</Button>
+                        </Link>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )
+            )}
+          </div>
+        ) : isLoading ? (
           <div className="flex min-h-64 flex-col items-center justify-center gap-2 border border-border/40 bg-surface/60 font-mono text-xs text-muted-foreground">
             <span className="live-dot" />
             <span>Loading {tab.toLowerCase()} bookings...</span>
@@ -2153,40 +2616,7 @@ export function BookingsPage() {
 }
 
 function ActiveParking() {
-  const [seconds, setSeconds] = useState(6135);
-  useEffect(() => {
-    const id = setInterval(() => setSeconds((s) => Math.max(0, s - 1)), 1000);
-    return () => clearInterval(id);
-  }, []);
-  const h = String(Math.floor(seconds / 3600)).padStart(2, "0"),
-    m = String(Math.floor((seconds % 3600) / 60)).padStart(2, "0"),
-    s = String(seconds % 60).padStart(2, "0");
-  return (
-    <div className="grid gap-5 lg:grid-cols-[1fr_300px]">
-      <div className="border border-selected/30 bg-selected/5 p-8">
-        <p className="flex items-center gap-2 font-mono text-xs uppercase tracking-widest text-selected">
-          <span className="live-dot" /> Active parking
-        </p>
-        <p className="mt-6 font-display text-6xl sm:text-8xl">
-          {h}:{m}:{s}
-        </p>
-        <p className="mt-2 text-muted-foreground">Time remaining · Slot A12</p>
-        <div className="mt-8 grid gap-3 sm:grid-cols-3">
-          <InfoRow label="Entry" value="10:02 AM" />
-          <InfoRow label="Vehicle" value="MH12AB1234" />
-          <InfoRow label="Location" value="Floor 1 · Zone A" />
-        </div>
-        <div className="mt-8 flex gap-2">
-          <Button>Extend parking</Button>
-          <Button variant="destructive">End parking</Button>
-        </div>
-      </div>
-      <div className="grid place-items-center border border-border bg-surface p-6">
-        <QRCodeSVG value="ACTIVE-SP-10231" size={180} />
-        <p className="mt-4 text-xs text-muted-foreground">Exit QR pass</p>
-      </div>
-    </div>
-  );
+  return <ActiveSessionCard />;
 }
 
 export function EVPage() {

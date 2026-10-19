@@ -25,13 +25,14 @@ export function usePayBooking() {
       method: PaymentMethod;
       idempotency_key: string;
       test_scenario?: TestScenario;
+      testScenario?: TestScenario;
     }) => {
       const res = await payBooking({
         data: {
           booking_id: params.booking_id,
           method: params.method,
           idempotency_key: params.idempotency_key,
-          test_scenario: params.test_scenario ?? "success",
+          test_scenario: params.test_scenario ?? params.testScenario ?? "success",
         },
       });
       return res;

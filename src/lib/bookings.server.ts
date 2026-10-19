@@ -200,7 +200,7 @@ export const createBooking = createServerFn({ method: "POST" })
       if (error.message.includes("duration")) {
         throw new Error("Selected booking duration is not permitted.");
       }
-      throw new Error("Failed to reserve parking space. Please try again.");
+      throw new Error(error.message || "Failed to reserve parking space. Please try again.");
     }
 
     return { booking };
@@ -308,7 +308,7 @@ export const getBooking = createServerFn({ method: "GET" })
       throw new Error("Booking identifier required.");
     }
 
-    const { data: booking, error } = await query.single();
+    const { data: booking, error } = await query.maybeSingle();
     if (error || !booking) {
       console.error("[getBooking] Error:", error?.message);
       throw new Error("Booking not found.");

@@ -225,9 +225,9 @@ export const adminUpdateSlot = createServerFn({ method: "POST" })
       .update(updatePayload)
       .eq("id", data.id)
       .select()
-      .single();
+      .maybeSingle();
 
-    if (error) {
+    if (error || !updated) {
       console.error("[adminUpdateSlot] Update error:", error.message);
       throw new Response("Failed to update parking slot", { status: 500 });
     }

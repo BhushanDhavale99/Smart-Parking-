@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import {
   Activity,
@@ -8,10 +8,12 @@ import {
   RefreshCw,
   AlertCircle,
   Inbox,
+  SquareSquare,
+  AlertTriangle,
+  StopCircle,
 } from "lucide-react";
 import { requireAdminGuard } from "@/lib/auth-guard";
-import { DemoBadge } from "@/components/admin/demo-badge";
-import { ADMIN_SESSIONS, type AdminSession } from "@/mocks/admin";
+import { useAdminSessions, useEndSession, type AdminSessionRow } from "@/hooks/useSessions";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -23,6 +25,18 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { formatIstDateTime, formatPaise } from "@/lib/date-utils";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin/sessions")({
   beforeLoad: async ({ location }) => {
@@ -33,7 +47,7 @@ export const Route = createFileRoute("/admin/sessions")({
       { title: "ParkGrid Admin | Sessions" },
       {
         name: "description",
-        content: "Barrier gate entry and exit records and active parking sessions.",
+        content: "Automated parking sessions, active vehicles, and overstay charge records.",
       },
     ],
   }),
@@ -45,39 +59,37 @@ function AdminSessionsPage() {
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const [loading, setLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [endTarget, setEndTarget] = useState<AdminSessionRow | null>(null);
 
-  const filteredSessions = useMemo(() => {
-    return ADMIN_SESSIONS.filter((s) => {
-      if (statusFilter === "in_progress" && s.status !== "in_progress") return false;
-      if (statusFilter === "completed" && s.status !== "completed") return false;
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase().trim();
-        const matchPlate = s.vehiclePlate.toLowerCase().includes(q);
-        const matchSlot = s.slotCode.toLowerCase().includes(q);
-        const matchGate = s.entryGate.toLowerCase().includes(q);
-        if (!matchPlate && !matchSlot && !matchGate) return false;
-      }
-      return true;
-    });
-  }, [statusFilter, searchQuery]);
+  const { data, isLoading, isError, error, refetch, isFetching } = useAdminSessions({
+    status: statusFilter,
+    search: searchQuery,
+    page,
+    pageSize,
+  });
 
-  const activeCount = ADMIN_SESSIONS.filter((s) => s.status === "in_progress").length;
-  const completedCount = ADMIN_SESSIONS.filter((s) => s.status === "completed").length;
+  const endSessionMutation = useEndSession();
 
-  const totalPages = Math.ceil(filteredSessions.length / pageSize) || 1;
-  const paginatedSessions = useMemo(() => {
-    const from = (page - 1) * pageSize;
-    return filteredSessions.slice(from, from + pageSize);
-  }, [filteredSessions, page, pageSize]);
+  const sessions = data?.sessions ?? [];
+  const totalCount = data?.totalCount ?? 0;
+  const totalPages = data?.totalPages ?? 1;
 
-  const handleRefresh = () => {
-    setLoading(true);
-    setErrorMsg(null);
-    setTimeout(() => {
-      setLoading(false);
-    }, 250);
+  const handleEndSession = async () => {
+    if (!endTarget) return;
+    try {
+      const res = await endSessionMutation.mutateAsync({
+        sessionId: endTarget.sessionId,
+      });
+      toast.success(
+        res.overstayTotalPaise > 0
+          ? `Session ended. Overstay fee of ${formatPaise(res.overstayTotalPaise)} charged.`
+          : "Parking session ended successfully.",
+      );
+      setEndTarget(null);
+      refetch();
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to end parking session");
+    }
   };
 
   return (
@@ -89,10 +101,9 @@ function AdminSessionsPage() {
             <h1 className="font-display text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
               Sessions
             </h1>
-            <DemoBadge />
           </div>
           <p className="mt-1 text-xs sm:text-sm text-muted-foreground">
-            Barrier gate entry and exit records and active parking sessions.
+            Automated parking session lifecycle, active vehicles, and overstay charge audit.
           </p>
         </div>
 
@@ -100,22 +111,13 @@ function AdminSessionsPage() {
           <Button
             size="sm"
             variant="outline"
-            onClick={handleRefresh}
-            disabled={loading}
+            onClick={() => refetch()}
+            disabled={isFetching}
             className="h-8 text-xs gap-1.5"
           >
-            <RefreshCw className={`size-3.5 ${loading ? "animate-spin" : ""}`} />
+            <RefreshCw className={`size-3.5 ${isFetching ? "animate-spin" : ""}`} />
             Refresh
           </Button>
-
-          <div className="hidden sm:flex items-center gap-2 text-xs font-mono text-muted-foreground">
-            <span className="rounded-md border border-border bg-surface px-2.5 py-1">
-              Active: <strong className="text-emerald-400 tabular-nums">{activeCount}</strong>
-            </span>
-            <span className="rounded-md border border-border bg-surface px-2.5 py-1">
-              Completed: <strong className="text-foreground tabular-nums">{completedCount}</strong>
-            </span>
-          </div>
         </div>
       </div>
 
@@ -129,7 +131,7 @@ function AdminSessionsPage() {
               setSearchQuery(e.target.value);
               setPage(1);
             }}
-            placeholder="Search license plate, gate, or bay..."
+            placeholder="Search license plate or bay..."
             className="h-8 pl-8 text-xs bg-background"
           />
         </div>
@@ -138,8 +140,9 @@ function AdminSessionsPage() {
           <div className="flex items-center gap-1">
             {[
               { id: "All", label: "All Sessions" },
-              { id: "in_progress", label: "In Facility" },
-              { id: "completed", label: "Exited" },
+              { id: "active", label: "Active" },
+              { id: "completed", label: "Completed" },
+              { id: "auto_ended", label: "Auto Ended" },
             ].map((item) => (
               <button
                 key={item.id}
@@ -173,13 +176,15 @@ function AdminSessionsPage() {
         </div>
       </div>
 
-      {/* ── Sessions Table (horizontal scroll container) ── */}
+      {/* ── Sessions Table ── */}
       <div className="rounded-xl border border-border bg-surface overflow-hidden shadow-sm">
-        {errorMsg ? (
+        {isError ? (
           <div className="p-8 text-center text-xs">
             <AlertCircle className="size-8 mx-auto mb-2 text-destructive" />
-            <p className="text-foreground font-semibold">{errorMsg}</p>
-            <Button size="sm" variant="outline" onClick={handleRefresh} className="mt-4 text-xs">
+            <p className="text-foreground font-semibold">
+              {error instanceof Error ? error.message : "Failed to load sessions."}
+            </p>
+            <Button size="sm" variant="outline" onClick={() => refetch()} className="mt-4 text-xs">
               Try again
             </Button>
           </div>
@@ -189,19 +194,19 @@ function AdminSessionsPage() {
               <TableHeader className="sticky top-0 bg-surface z-10 border-b border-border">
                 <TableRow className="border-border hover:bg-transparent">
                   <TableHead className="font-mono text-xs uppercase text-muted-foreground">
-                    Session
+                    Booking / Session
                   </TableHead>
                   <TableHead className="font-mono text-xs uppercase text-muted-foreground">
-                    Vehicle Plate
+                    Vehicle Plate & User
                   </TableHead>
                   <TableHead className="font-mono text-xs uppercase text-muted-foreground">
                     Bay / Floor
                   </TableHead>
                   <TableHead className="font-mono text-xs uppercase text-muted-foreground">
-                    Entry Gate & Time
+                    Started (Entry)
                   </TableHead>
                   <TableHead className="font-mono text-xs uppercase text-muted-foreground">
-                    Exit Gate & Time
+                    Booked End / Exit
                   </TableHead>
                   <TableHead className="font-mono text-xs uppercase text-muted-foreground">
                     Duration
@@ -210,38 +215,51 @@ function AdminSessionsPage() {
                     Status
                   </TableHead>
                   <TableHead className="font-mono text-xs uppercase text-muted-foreground text-right">
-                    Fee
+                    Overstay Fee
+                  </TableHead>
+                  <TableHead className="font-mono text-xs uppercase text-muted-foreground text-right">
+                    Action
                   </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {loading ? (
+                {isLoading ? (
                   Array.from({ length: 5 }).map((_, i) => (
                     <TableRow key={i} className="border-border/60">
-                      <TableCell colSpan={8} className="py-3.5">
+                      <TableCell colSpan={9} className="py-3.5">
                         <div className="h-4 w-full animate-pulse rounded bg-accent/40" />
                       </TableCell>
                     </TableRow>
                   ))
-                ) : paginatedSessions.length === 0 ? (
+                ) : sessions.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="h-36 text-center text-muted-foreground">
+                    <TableCell colSpan={9} className="h-36 text-center text-muted-foreground">
                       <div className="flex flex-col items-center justify-center gap-1.5 py-6">
                         <Inbox className="size-6 text-muted-foreground/60" />
-                        <span className="text-xs">No sessions match this filter.</span>
+                        <span className="text-xs">No parking sessions match this filter.</span>
                       </div>
                     </TableCell>
                   </TableRow>
                 ) : (
-                  paginatedSessions.map((s) => (
-                    <TableRow key={s.id} className="border-border/60 text-xs hover:bg-accent/40">
-                      <TableCell className="font-mono font-bold text-foreground">{s.id}</TableCell>
+                  sessions.map((s) => (
+                    <TableRow
+                      key={s.sessionId}
+                      className="border-border/60 text-xs hover:bg-accent/40"
+                    >
+                      <TableCell>
+                        <div className="font-mono font-bold text-foreground">
+                          {s.bookingReference}
+                        </div>
+                        <span className="font-mono text-[10px] text-muted-foreground">
+                          {s.sessionId.slice(0, 8)}...
+                        </span>
+                      </TableCell>
                       <TableCell>
                         <div className="font-mono font-semibold text-foreground">
-                          {s.vehiclePlate}
+                          {s.plateSnapshot}
                         </div>
-                        <span className="text-[10px] text-muted-foreground capitalize">
-                          {s.vehicleType}
+                        <span className="text-[10px] text-muted-foreground">
+                          {s.userFullName || "Member"}
                         </span>
                       </TableCell>
                       <TableCell>
@@ -249,46 +267,85 @@ function AdminSessionsPage() {
                           Bay {s.slotCode}
                         </span>
                         <span className="text-muted-foreground ml-1.5 text-[11px] font-mono">
-                          (Lvl {s.level})
+                          (Lvl {s.levelCode})
                         </span>
                       </TableCell>
                       <TableCell>
-                        <div className="text-foreground">{s.entryGate}</div>
-                        <div className="font-mono text-[10px] text-muted-foreground tabular-nums">
-                          {s.entryTime.replace("+05:30", "").split("T")[1]} IST
+                        <div className="font-mono text-foreground">
+                          {formatIstDateTime(s.startedAt)}
                         </div>
                       </TableCell>
                       <TableCell>
-                        {s.exitTime ? (
-                          <>
-                            <div className="text-foreground">{s.exitGate}</div>
-                            <div className="font-mono text-[10px] text-muted-foreground tabular-nums">
-                              {s.exitTime.replace("+05:30", "").split("T")[1]} IST
-                            </div>
-                          </>
+                        {s.endedAt ? (
+                          <div className="font-mono text-foreground">
+                            {formatIstDateTime(s.endedAt)}
+                          </div>
                         ) : (
-                          <span className="font-mono text-muted-foreground/50">
-                            — Active inside —
-                          </span>
+                          <div>
+                            <span className="inline-flex items-center gap-1 font-mono text-emerald-400 text-[11px]">
+                              <span className="live-dot" /> Parked (until{" "}
+                              {formatIstDateTime(s.bookedEndAt)})
+                            </span>
+                          </div>
                         )}
                       </TableCell>
                       <TableCell className="font-mono text-muted-foreground tabular-nums">
-                        {Math.floor(s.durationMinutes / 60)}h {s.durationMinutes % 60}m
+                        {s.durationMinutes != null
+                          ? `${Math.floor(s.durationMinutes / 60)}h ${s.durationMinutes % 60}m`
+                          : "— In progress —"}
                       </TableCell>
                       <TableCell>
-                        <Badge
-                          variant="outline"
-                          className={`text-[10px] font-mono uppercase px-2 py-0.5 rounded ${
-                            s.status === "in_progress"
-                              ? "border-emerald-500/40 text-emerald-400 bg-emerald-500/10"
-                              : "border-border/60 text-muted-foreground bg-muted/40"
-                          }`}
-                        >
-                          {s.status === "in_progress" ? "In Facility" : "Exited"}
-                        </Badge>
+                        {s.status === "active" ? (
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] font-mono uppercase px-2 py-0.5 rounded border-emerald-500/40 text-emerald-400 bg-emerald-500/10"
+                          >
+                            Active
+                          </Badge>
+                        ) : s.status === "auto_ended" ? (
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] font-mono uppercase px-2 py-0.5 rounded border-amber-500/40 text-amber-400 bg-amber-500/10 gap-1 inline-flex items-center"
+                          >
+                            <AlertTriangle className="size-2.5" /> Auto Ended
+                          </Badge>
+                        ) : s.status === "cancelled" ? (
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] font-mono uppercase px-2 py-0.5 rounded border-rose-500/40 text-rose-400 bg-rose-500/10"
+                          >
+                            Cancelled
+                          </Badge>
+                        ) : (
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] font-mono uppercase px-2 py-0.5 rounded border-border/60 text-muted-foreground bg-muted/40"
+                          >
+                            Completed
+                          </Badge>
+                        )}
                       </TableCell>
                       <TableCell className="font-mono font-bold text-right text-foreground tabular-nums">
-                        ₹{s.feeAmount}
+                        {s.overstayTotalPaise > 0 ? (
+                          <span className="text-amber-400">
+                            {formatPaise(s.overstayTotalPaise)}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">₹0</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {s.status === "active" && !s.endedAt && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-[11px] gap-1 text-destructive hover:bg-destructive/10"
+                            onClick={() => setEndTarget(s)}
+                          >
+                            <StopCircle className="size-3" />
+                            End
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))
@@ -298,13 +355,11 @@ function AdminSessionsPage() {
           </div>
         )}
 
-        {/* Consistent Pagination Footer */}
+        {/* Pagination Footer */}
         <div className="border-t border-border/60 px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted-foreground font-mono">
           <div>
-            Showing{" "}
-            <strong className="text-foreground tabular-nums">{paginatedSessions.length}</strong> of{" "}
-            <strong className="text-foreground tabular-nums">{filteredSessions.length}</strong>{" "}
-            sessions
+            Showing <strong className="text-foreground tabular-nums">{sessions.length}</strong> of{" "}
+            <strong className="text-foreground tabular-nums">{totalCount}</strong> sessions
           </div>
 
           <div className="flex items-center gap-2">
@@ -315,7 +370,7 @@ function AdminSessionsPage() {
               variant="outline"
               size="icon"
               className="size-7"
-              disabled={page <= 1 || loading}
+              disabled={page <= 1 || isLoading}
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               aria-label="Previous page"
             >
@@ -325,7 +380,7 @@ function AdminSessionsPage() {
               variant="outline"
               size="icon"
               className="size-7"
-              disabled={page >= totalPages || loading}
+              disabled={page >= totalPages || isLoading}
               onClick={() => setPage((p) => p + 1)}
               aria-label="Next page"
             >
@@ -334,6 +389,44 @@ function AdminSessionsPage() {
           </div>
         </div>
       </div>
+
+      {/* ── Admin End Session Confirmation Dialog ── */}
+      <AlertDialog open={Boolean(endTarget)} onOpenChange={(open) => !open && setEndTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>End parking session?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-xs text-muted-foreground text-left">
+                <p>
+                  You are about to manually end parking session for vehicle{" "}
+                  <strong className="text-foreground">{endTarget?.plateSnapshot}</strong> at Bay{" "}
+                  <strong className="text-foreground">{endTarget?.slotCode}</strong>.
+                </p>
+                <p>
+                  Booked departure:{" "}
+                  <strong className="text-foreground">
+                    {endTarget ? formatIstDateTime(endTarget.bookedEndAt) : ""}
+                  </strong>
+                  . Any overstay beyond the 15-minute grace period will be computed and recorded.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={endSessionMutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                handleEndSession();
+              }}
+              disabled={endSessionMutation.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {endSessionMutation.isPending ? "Ending..." : "Confirm & End Session"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

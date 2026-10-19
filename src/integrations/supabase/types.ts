@@ -172,6 +172,7 @@ export type Database = {
         Row: {
           id: boolean;
           gst_bps: number;
+          exit_grace_minutes: number;
           hold_minutes: number;
           min_hours: number;
           max_hours: number;
@@ -187,6 +188,7 @@ export type Database = {
         Insert: {
           id?: boolean;
           gst_bps?: number;
+          exit_grace_minutes?: number;
           hold_minutes?: number;
           min_hours?: number;
           max_hours?: number;
@@ -202,6 +204,7 @@ export type Database = {
         Update: {
           id?: boolean;
           gst_bps?: number;
+          exit_grace_minutes?: number;
           hold_minutes?: number;
           min_hours?: number;
           max_hours?: number;
@@ -426,6 +429,179 @@ export type Database = {
           },
         ];
       };
+      parking_sessions: {
+        Row: {
+          id: string;
+          booking_id: string;
+          user_id: string;
+          started_at: string;
+          booked_end_at: string;
+          ended_at: string | null;
+          ended_by_admin: boolean;
+          duration_minutes: number | null;
+          status: "active" | "completed" | "auto_ended" | "cancelled";
+          auto_ended: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          booking_id: string;
+          user_id: string;
+          started_at: string;
+          booked_end_at: string;
+          ended_at?: string | null;
+          ended_by_admin?: boolean;
+          duration_minutes?: number | null;
+          status?: "active" | "completed" | "auto_ended" | "cancelled";
+          auto_ended?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          booking_id?: string;
+          user_id?: string;
+          started_at?: string;
+          booked_end_at?: string;
+          ended_at?: string | null;
+          ended_by_admin?: boolean;
+          duration_minutes?: number | null;
+          status?: "active" | "completed" | "auto_ended" | "cancelled";
+          auto_ended?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "parking_sessions_booking_id_fkey";
+            columns: ["booking_id"];
+            isOneToOne: true;
+            referencedRelation: "bookings";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "parking_sessions_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      overstay_charges: {
+        Row: {
+          id: string;
+          session_id: string;
+          booking_id: string;
+          user_id: string;
+          overstay_minutes: number;
+          base_paise: number;
+          gst_paise: number;
+          total_paise: number;
+          provider_ref: string | null;
+          receipt_number: string | null;
+          paid_at: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          session_id: string;
+          booking_id: string;
+          user_id: string;
+          overstay_minutes: number;
+          base_paise: number;
+          gst_paise: number;
+          total_paise: number;
+          provider_ref?: string | null;
+          receipt_number?: string | null;
+          paid_at?: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          session_id?: string;
+          booking_id?: string;
+          user_id?: string;
+          overstay_minutes?: number;
+          base_paise?: number;
+          gst_paise?: number;
+          total_paise?: number;
+          provider_ref?: string | null;
+          receipt_number?: string | null;
+          paid_at?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "overstay_charges_session_id_fkey";
+            columns: ["session_id"];
+            isOneToOne: false;
+            referencedRelation: "parking_sessions";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "overstay_charges_booking_id_fkey";
+            columns: ["booking_id"];
+            isOneToOne: false;
+            referencedRelation: "bookings";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      notifications: {
+        Row: {
+          id: string;
+          user_id: string;
+          title: string;
+          body: string | null;
+          message: string | null;
+          type: string;
+          is_read: boolean;
+          read: boolean;
+          metadata: Json;
+          link: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          title?: string;
+          body?: string | null;
+          message?: string | null;
+          type?: string;
+          is_read?: boolean;
+          read?: boolean;
+          metadata?: Json;
+          link?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          title?: string;
+          body?: string | null;
+          message?: string | null;
+          type?: string;
+          is_read?: boolean;
+          read?: boolean;
+          metadata?: Json;
+          link?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "notifications_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: {
       [_ in never]: never;
@@ -512,6 +688,113 @@ export type Database = {
           p_test_scenario?: string | null;
         };
         Returns: Json;
+      };
+      get_active_session: {
+        Args: {
+          p_booking_id?: string | null;
+        };
+        Returns: {
+          session_id: string;
+          booking_id: string;
+          user_id: string;
+          started_at: string;
+          booked_end_at: string;
+          ended_at: string | null;
+          status: string;
+          auto_ended: boolean;
+          ended_by_admin: boolean;
+          duration_minutes: number | null;
+          is_active: boolean;
+          elapsed_seconds: number;
+          seconds_remaining: number;
+          overstay_seconds: number;
+          overstay_paise_so_far: number;
+        }[];
+      };
+      end_session: {
+        Args: {
+          p_session_id: string;
+        };
+        Returns: {
+          session_id: string;
+          booking_id: string;
+          ended_at: string;
+          duration_minutes: number;
+          overstay_minutes: number;
+          overstay_total_paise: number;
+        }[];
+      };
+      list_my_sessions: {
+        Args: {
+          p_status?: string | null;
+          p_page?: number;
+          p_page_size?: number;
+        };
+        Returns: {
+          session_id: string;
+          booking_id: string;
+          started_at: string;
+          booked_end_at: string;
+          ended_at: string | null;
+          status: string;
+          auto_ended: boolean;
+          duration_minutes: number | null;
+          booking_reference: string;
+          slot_code: string;
+          level_code: string;
+          plate_snapshot: string;
+          overstay_total_paise: number;
+          total_count: number;
+        }[];
+      };
+      get_session: {
+        Args: {
+          p_session_id: string;
+        };
+        Returns: {
+          session_id: string;
+          booking_id: string;
+          user_id: string;
+          started_at: string;
+          booked_end_at: string;
+          ended_at: string | null;
+          status: string;
+          auto_ended: boolean;
+          ended_by_admin: boolean;
+          duration_minutes: number | null;
+          booking_reference: string;
+          slot_code: string;
+          level_code: string;
+          plate_snapshot: string;
+          overstay_total_paise: number;
+        }[];
+      };
+      admin_list_sessions: {
+        Args: {
+          p_status?: string | null;
+          p_search?: string | null;
+          p_page?: number;
+          p_page_size?: number;
+        };
+        Returns: {
+          session_id: string;
+          booking_id: string;
+          user_id: string;
+          started_at: string;
+          booked_end_at: string;
+          ended_at: string | null;
+          status: string;
+          auto_ended: boolean;
+          ended_by_admin: boolean;
+          duration_minutes: number | null;
+          booking_reference: string;
+          slot_code: string;
+          level_code: string;
+          plate_snapshot: string;
+          user_full_name: string | null;
+          overstay_total_paise: number;
+          total_count: number;
+        }[];
       };
     };
     Enums: {

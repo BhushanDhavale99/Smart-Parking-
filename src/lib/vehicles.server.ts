@@ -148,9 +148,9 @@ export const createVehicle = createServerFn({ method: "POST" })
         is_default: false,
       })
       .select()
-      .single();
+      .maybeSingle();
 
-    if (error) {
+    if (error || !newVehicle) {
       console.error("[createVehicle] Database error:", error.code, error.message);
       if (error.code === "23505" || error.message.includes("plate")) {
         throw new Error("A vehicle with this plate number is already registered to your account.");
@@ -252,7 +252,7 @@ export const updateVehicle = createServerFn({ method: "POST" })
       .eq("user_id", authUser.user.id)
       .is("archived_at", null)
       .select()
-      .single();
+      .maybeSingle();
 
     if (error || !updatedVehicle) {
       console.error("[updateVehicle] Database error:", error?.code, error?.message);
@@ -338,7 +338,7 @@ export const archiveVehicle = createServerFn({ method: "POST" })
       .eq("user_id", authUser.user.id)
       .is("archived_at", null)
       .select()
-      .single();
+      .maybeSingle();
 
     if (error || !archived) {
       console.error("[archiveVehicle] Error:", error?.message);
