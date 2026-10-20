@@ -5,8 +5,10 @@ import {
   listMySessions,
   getSession,
   adminListSessions,
+  adminActiveSessions,
+  type AdminActiveSessionRow,
 } from "@/lib/sessions.server";
-import { BOOKINGS_QUERY_KEY } from "./useBookings";
+import { BOOKINGS_QUERY_KEY, invalidateBookingRelatedQueries } from "./useBookings";
 
 export const SESSIONS_QUERY_KEY = ["sessions"] as const;
 
@@ -74,7 +76,7 @@ export function useActiveSession(bookingId?: string | null) {
       });
       return (res.session as ActiveSessionData | null) ?? null;
     },
-    refetchInterval: 1000 * 15, // poll every 15s to keep active timer / overstay fresh
+    refetchInterval: 1000 * 60, // 60s fallback polling
     staleTime: 1000 * 10,
   });
 }
@@ -89,8 +91,7 @@ export function useEndSession() {
       return res;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: SESSIONS_QUERY_KEY });
-      queryClient.invalidateQueries({ queryKey: BOOKINGS_QUERY_KEY });
+      invalidateBookingRelatedQueries(queryClient);
     },
   });
 }
@@ -155,5 +156,18 @@ export function useAdminSessions(params: {
       };
     },
     staleTime: 1000 * 15,
+  });
+}
+
+export type { AdminActiveSessionRow };
+
+export function useAdminActiveSessions() {
+  return useQuery({
+    queryKey: [...SESSIONS_QUERY_KEY, "admin_active"],
+    queryFn: async () => {
+      const res = await adminActiveSessions();
+      return res.sessions;
+    },
+    refetchInterval: 1000 * 60, // 60s fallback polling
   });
 }

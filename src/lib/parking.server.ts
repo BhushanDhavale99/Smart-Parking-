@@ -5,6 +5,18 @@ import type { Database } from "@/integrations/supabase/types";
 export type ParkingLevelRow = Database["public"]["Tables"]["parking_levels"]["Row"];
 export type ParkingSlotRow = Database["public"]["Tables"]["parking_slots"]["Row"];
 
+export type ParkingSlotWithOccupancy = ParkingSlotRow & {
+  is_occupied: boolean;
+  current_booking?: {
+    id: string;
+    reference: string;
+    status: string;
+    start_at: string;
+    end_at: string;
+    plate_snapshot?: string | null;
+  } | null;
+};
+
 // ── Shared Helper: Create Per-Request Scoped Supabase Client ──
 async function getScopedClient(request: Request) {
   const authHeader = request.headers.get("authorization") ?? "";
@@ -38,6 +50,7 @@ async function getScopedClient(request: Request) {
 // ── 1. listSlots ─────────────────────────────────────────────
 // Filters: level, zone, slot_type, admin_status, search, pagination.
 // Requires valid authenticated user; executes query with caller's own token (RLS enforced).
+// Computes live occupancy state from bookings and active sessions.
 const listSlotsSchema = z.object({
   level: z.enum(["All", "B2", "B1", "G1", "L1", "L2"]).default("All"),
   zone: z.enum(["All", "A", "B", "EV"]).default("All"),
@@ -60,7 +73,7 @@ export const listSlots = createServerFn({ method: "GET" })
     }
 
     const { requireUser } = await import("@/lib/auth.server");
-    await requireUser(request);
+    const authUser = await requireUser(request);
 
     const client = await getScopedClient(request);
 
@@ -92,17 +105,135 @@ export const listSlots = createServerFn({ method: "GET" })
       query = query.range(from, to);
     }
 
-    const { data: slots, error, count } = await query;
+    const { data: rawSlots, error, count } = await query;
     if (error) {
       console.error("[listSlots] Supabase error:", error.message);
       throw new Response("Failed to fetch parking slots", { status: 500 });
     }
 
-    const totalCount = count ?? (slots?.length || 0);
+    const slots = rawSlots || [];
+    const totalCount = count ?? slots.length;
     const totalPages = data.pageSize > 0 ? Math.ceil(totalCount / data.pageSize) || 1 : 1;
 
+    if (slots.length === 0) {
+      return {
+        slots: [] as ParkingSlotWithOccupancy[],
+        totalCount: 0,
+        page: data.page,
+        pageSize: data.pageSize,
+        totalPages: 1,
+      };
+    }
+
+    // Compute live occupancy for the returned bays
+    const now = new Date();
+    const nowIso = now.toISOString();
+    const slotIds = slots.map((s) => s.id);
+
+    const activeBookingMap = new Map<
+      string,
+      {
+        id: string;
+        reference: string;
+        status: string;
+        start_at: string;
+        end_at: string;
+        plate_snapshot?: string | null;
+      }
+    >();
+    const occupiedSlotIdSet = new Set<string>();
+
+    if (authUser.role === "admin") {
+      // Admins query public.bookings and public.parking_sessions directly
+      const [bookingsRes, sessionsRes] = await Promise.all([
+        client
+          .from("bookings")
+          .select("id, slot_id, reference, status, start_at, end_at, plate_snapshot")
+          .in("slot_id", slotIds)
+          .in("status", ["reserved", "confirmed", "active"])
+          .lte("start_at", nowIso)
+          .gte("end_at", nowIso),
+        client
+          .from("parking_sessions")
+          .select("booking_id")
+          .eq("status", "active")
+          .is("ended_at", null),
+      ]);
+
+      if (bookingsRes.data) {
+        for (const b of bookingsRes.data) {
+          occupiedSlotIdSet.add(b.slot_id);
+          activeBookingMap.set(b.slot_id, {
+            id: b.id,
+            reference: b.reference,
+            status: b.status,
+            start_at: b.start_at,
+            end_at: b.end_at,
+            plate_snapshot: b.plate_snapshot,
+          });
+        }
+      }
+
+      // Check if any active sessions belong to these bays
+      const sessionBookingIds = (sessionsRes.data ?? [])
+        .map((s) => s.booking_id)
+        .filter((bookingId): bookingId is string => Boolean(bookingId));
+
+      if (sessionBookingIds.length > 0) {
+        const { data: sessionBookings } = await client
+          .from("bookings")
+          .select("id, slot_id, reference, status, start_at, end_at, plate_snapshot")
+          .in("id", sessionBookingIds)
+          .in("slot_id", slotIds);
+
+        if (sessionBookings) {
+          for (const b of sessionBookings) {
+            occupiedSlotIdSet.add(b.slot_id);
+            if (!activeBookingMap.has(b.slot_id)) {
+              activeBookingMap.set(b.slot_id, {
+                id: b.id,
+                reference: b.reference,
+                status: b.status,
+                start_at: b.start_at,
+                end_at: b.end_at,
+                plate_snapshot: b.plate_snapshot,
+              });
+            }
+          }
+        }
+      }
+    } else {
+      // Members determine slot availability safely via security-definer RPC
+      const plusOneHourIso = new Date(now.getTime() + 60 * 60 * 1000).toISOString();
+      const { data: availRows, error: availError } = await client.rpc("slot_availability", {
+        p_start: nowIso,
+        p_end: plusOneHourIso,
+        p_level: data.level === "All" ? null : data.level,
+        p_zone: data.zone === "All" ? null : data.zone,
+        p_slot_type: data.slot_type === "All" ? null : data.slot_type,
+      });
+
+      if (!availError && availRows) {
+        for (const row of availRows) {
+          if (!row.is_available) {
+            occupiedSlotIdSet.add(row.slot_id);
+          }
+        }
+      }
+    }
+
+    const enhancedSlots: ParkingSlotWithOccupancy[] = slots.map((slot) => {
+      const booking = activeBookingMap.get(slot.id) ?? null;
+      const isOccupied = occupiedSlotIdSet.has(slot.id) || Boolean(booking);
+      return {
+        ...slot,
+        is_occupied: isOccupied,
+        current_booking: booking,
+      };
+    });
+
     return {
-      slots: slots || [],
+      slots: enhancedSlots,
       totalCount,
       page: data.page,
       pageSize: data.pageSize,
@@ -111,7 +242,7 @@ export const listSlots = createServerFn({ method: "GET" })
   });
 
 // ── 2. getFacilitySummary ────────────────────────────────────
-// Aggregates counts per level and type.
+// Aggregates counts per level and type, including current live occupancy.
 // Requires valid authenticated user; executes query with caller's own token (RLS enforced).
 export const getFacilitySummary = createServerFn({ method: "GET" }).handler(async () => {
   const { getRequest } = await import("@tanstack/react-start/server");
@@ -125,9 +256,20 @@ export const getFacilitySummary = createServerFn({ method: "GET" }).handler(asyn
 
   const client = await getScopedClient(request);
 
-  const [levelsRes, slotsRes] = await Promise.all([
+  const now = new Date();
+  const nowIso = now.toISOString();
+  const plusOneHourIso = new Date(now.getTime() + 60 * 60 * 1000).toISOString();
+
+  const [levelsRes, slotsRes, availRes] = await Promise.all([
     client.from("parking_levels").select("*").order("sort_order", { ascending: true }),
-    client.from("parking_slots").select("code, level_code, zone, slot_type, admin_status"),
+    client.from("parking_slots").select("id, code, level_code, zone, slot_type, admin_status"),
+    client.rpc("slot_availability", {
+      p_start: nowIso,
+      p_end: plusOneHourIso,
+      p_level: null,
+      p_zone: null,
+      p_slot_type: null,
+    }),
   ]);
 
   if (levelsRes.error) {
@@ -141,37 +283,58 @@ export const getFacilitySummary = createServerFn({ method: "GET" }).handler(asyn
 
   const levels = levelsRes.data || [];
   const slots = slotsRes.data || [];
+  const occupiedSet = new Set(
+    (availRes.data || []).filter((r) => !r.is_available).map((r) => r.slot_id),
+  );
 
   const byLevel: Record<
     string,
-    { total: number; active: number; maintenance: number; blocked: number }
+    { total: number; active: number; occupied: number; maintenance: number; blocked: number }
   > = {};
   for (const lvl of levels) {
-    byLevel[lvl.code] = { total: 0, active: 0, maintenance: 0, blocked: 0 };
+    byLevel[lvl.code] = { total: 0, active: 0, occupied: 0, maintenance: 0, blocked: 0 };
   }
 
   const byType = { standard: 0, ev: 0, accessible: 0 };
-  const byStatus = { active: 0, maintenance: 0, blocked: 0 };
+  const byStatus = { active: 0, occupied: 0, maintenance: 0, blocked: 0 };
 
   for (const slot of slots) {
+    const isOccupied = occupiedSet.has(slot.id);
     const levelStats = byLevel[slot.level_code];
     if (levelStats) {
       levelStats.total += 1;
-      if (slot.admin_status === "active") levelStats.active += 1;
-      else if (slot.admin_status === "maintenance") levelStats.maintenance += 1;
-      else if (slot.admin_status === "blocked") levelStats.blocked += 1;
+      if (slot.admin_status === "active") {
+        if (isOccupied) {
+          levelStats.occupied += 1;
+        } else {
+          levelStats.active += 1;
+        }
+      } else if (slot.admin_status === "maintenance") {
+        levelStats.maintenance += 1;
+      } else if (slot.admin_status === "blocked") {
+        levelStats.blocked += 1;
+      }
     }
 
     if (slot.slot_type in byType) {
       byType[slot.slot_type as keyof typeof byType] += 1;
     }
-    if (slot.admin_status in byStatus) {
+
+    if (slot.admin_status === "active") {
+      if (isOccupied) {
+        byStatus.occupied += 1;
+      } else {
+        byStatus.active += 1;
+      }
+    } else if (slot.admin_status in byStatus) {
       byStatus[slot.admin_status as keyof typeof byStatus] += 1;
     }
   }
 
   return {
     totalSlots: slots.length,
+    occupiedSlots: occupiedSet.size,
+    availableSlots: slots.filter((s) => s.admin_status === "active" && !occupiedSet.has(s.id)).length,
     levels,
     byLevel,
     byType,
@@ -228,7 +391,7 @@ export const adminUpdateSlot = createServerFn({ method: "POST" })
       .maybeSingle();
 
     if (error || !updated) {
-      console.error("[adminUpdateSlot] Update error:", error.message);
+      console.error("[adminUpdateSlot] Update error:", error?.message);
       throw new Response("Failed to update parking slot", { status: 500 });
     }
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { MapPin, Zap, CarFront, Search, Filter, RefreshCw, AlertCircle } from "lucide-react";
 import { requireAdminGuard } from "@/lib/auth-guard";
@@ -6,7 +6,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { listSlots, type ParkingSlotRow } from "@/lib/parking.server";
+import { useParkingSlots } from "@/hooks/useBookings";
+import { useRealtimeStatus } from "@/lib/realtime";
+import type { ParkingSlotWithOccupancy } from "@/lib/parking.server";
+import { formatIstTime } from "@/lib/date-utils";
 
 export const Route = createFileRoute("/admin/map")({
   beforeLoad: async ({ location }) => {
@@ -25,7 +28,7 @@ export const Route = createFileRoute("/admin/map")({
   component: AdminLiveMapPage,
 });
 
-type OperationalStatus = "active" | "maintenance" | "blocked";
+type OperationalStatus = "active" | "occupied" | "maintenance" | "blocked";
 
 const STATUS_CONFIG: Record<
   OperationalStatus,
@@ -37,6 +40,13 @@ const STATUS_CONFIG: Record<
     border: "border-emerald-500/40",
     text: "text-emerald-400",
     dot: "bg-emerald-500",
+  },
+  occupied: {
+    label: "Occupied",
+    bg: "bg-blue-500/10 hover:bg-blue-500/20",
+    border: "border-blue-500/40",
+    text: "text-blue-400",
+    dot: "bg-blue-400",
   },
   maintenance: {
     label: "Maintenance",
@@ -54,46 +64,43 @@ const STATUS_CONFIG: Record<
   },
 };
 
+function getSlotOperationalStatus(slot: ParkingSlotWithOccupancy): OperationalStatus {
+  if (slot.admin_status === "maintenance") return "maintenance";
+  if (slot.admin_status === "blocked") return "blocked";
+  if (slot.is_occupied) return "occupied";
+  return "active";
+}
+
 export function AdminLiveMapPage() {
   const [selectedLevel, setSelectedLevel] = useState<string>("All");
   const [statusFilter, setStatusFilter] = useState<string>("All");
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeSlot, setActiveSlot] = useState<ParkingSlotRow | null>(null);
-
-  const [allSlots, setAllSlots] = useState<ParkingSlotRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [activeSlot, setActiveSlot] = useState<ParkingSlotWithOccupancy | null>(null);
 
   const levels = ["All", "B2", "B1", "G1", "L1", "L2"];
-  const statuses = ["All", "active", "maintenance", "blocked"];
+  const statuses = ["All", "active", "occupied", "maintenance", "blocked"];
 
-  const loadSlots = useCallback(async () => {
-    setLoading(true);
-    setErrorMsg(null);
-    try {
-      const res = await listSlots({
-        data: {
-          level: "All",
-          pageSize: 0, // Load all 150 bays
-        },
-      });
-      setAllSlots(res.slots as unknown as ParkingSlotRow[]);
-    } catch (err: unknown) {
-      console.error("[AdminLiveMap] Failed to load facility slots:", err);
-      setErrorMsg("Failed to load map bays. Please check your database connection or retry.");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const {
+    data: slotsRes,
+    isLoading: loading,
+    error: queryError,
+    refetch,
+    isFetching,
+  } = useParkingSlots({
+    level: "All",
+    pageSize: 0,
+  });
 
-  useEffect(() => {
-    loadSlots();
-  }, [loadSlots]);
+  const allSlots = (slotsRes?.slots ?? []) as ParkingSlotWithOccupancy[];
+  const errorMsg = queryError
+    ? "Failed to load map bays. Please check your database connection or retry."
+    : null;
 
   const filteredSlots = useMemo(() => {
     return allSlots.filter((slot) => {
+      const opStatus = getSlotOperationalStatus(slot);
       if (selectedLevel !== "All" && slot.level_code !== selectedLevel) return false;
-      if (statusFilter !== "All" && slot.admin_status !== statusFilter) return false;
+      if (statusFilter !== "All" && opStatus !== statusFilter) return false;
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
         if (!slot.code.toLowerCase().includes(q)) return false;
@@ -104,11 +111,20 @@ export function AdminLiveMapPage() {
 
   const countByStatus = useMemo(() => {
     return {
-      active: allSlots.filter((s) => s.admin_status === "active").length,
-      maintenance: allSlots.filter((s) => s.admin_status === "maintenance").length,
-      blocked: allSlots.filter((s) => s.admin_status === "blocked").length,
+      active: allSlots.filter((s) => getSlotOperationalStatus(s) === "active").length,
+      occupied: allSlots.filter((s) => getSlotOperationalStatus(s) === "occupied").length,
+      maintenance: allSlots.filter((s) => getSlotOperationalStatus(s) === "maintenance").length,
+      blocked: allSlots.filter((s) => getSlotOperationalStatus(s) === "blocked").length,
     };
   }, [allSlots]);
+
+  // Keep activeSlot synchronized with fresh query data
+  const inspectedSlot = useMemo(() => {
+    if (!activeSlot) return null;
+    return allSlots.find((s) => s.id === activeSlot.id) ?? activeSlot;
+  }, [allSlots, activeSlot]);
+
+  const { isLive } = useRealtimeStatus();
 
   return (
     <div className="space-y-6">
@@ -121,21 +137,30 @@ export function AdminLiveMapPage() {
             </h1>
             <Badge
               variant="outline"
-              className="gap-1 border-primary/40 bg-primary/10 text-primary text-[10px] font-mono px-2 py-0.5 rounded"
+              className={cn(
+                "gap-1 text-[10px] font-mono px-2 py-0.5 rounded transition-colors",
+                isLive
+                  ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-400"
+                  : "border-primary/40 bg-primary/10 text-primary",
+              )}
             >
-              <span className="size-1.5 rounded-full bg-emerald-400" />
-              Live facility bays
+              <span
+                className={cn(
+                  "size-1.5 rounded-full",
+                  isLive ? "bg-emerald-400 animate-pulse" : "bg-muted-foreground",
+                )}
+              />
+              {isLive ? "Live Connected" : "Live facility bays"}
             </Badge>
           </div>
           <p className="mt-1 text-xs sm:text-sm text-muted-foreground">
-            Multi-floor visual bay layout. Live occupancy arrives with bookings; slot statuses
-            reflect admin maintenance/blocked controls.
+            Multi-floor visual bay layout. Real-time slot occupancy derived from active bookings and sessions.
           </p>
         </div>
 
         {/* Legend & Refresh */}
         <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs font-mono">
-          {(["active", "maintenance", "blocked"] as OperationalStatus[]).map((st) => {
+          {(["active", "occupied", "maintenance", "blocked"] as OperationalStatus[]).map((st) => {
             const conf = STATUS_CONFIG[st];
             return (
               <span
@@ -152,11 +177,11 @@ export function AdminLiveMapPage() {
           <Button
             size="sm"
             variant="outline"
-            onClick={loadSlots}
-            disabled={loading}
+            onClick={() => refetch()}
+            disabled={isFetching}
             className="h-8 text-xs gap-1.5 ml-2"
           >
-            <RefreshCw className={`size-3.5 ${loading ? "animate-spin" : ""}`} />
+            <RefreshCw className={`size-3.5 ${isFetching ? "animate-spin" : ""}`} />
             Refresh
           </Button>
         </div>
@@ -246,7 +271,7 @@ export function AdminLiveMapPage() {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={loadSlots}
+                onClick={() => refetch()}
                 className="mt-4 text-xs gap-1.5"
               >
                 <RefreshCw className="size-3" /> Retry
@@ -275,8 +300,9 @@ export function AdminLiveMapPage() {
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 gap-2.5">
               {filteredSlots.map((slot) => {
-                const conf = STATUS_CONFIG[slot.admin_status] ?? STATUS_CONFIG.active;
-                const isSelected = activeSlot?.id === slot.id;
+                const opStatus = getSlotOperationalStatus(slot);
+                const conf = STATUS_CONFIG[opStatus] ?? STATUS_CONFIG.active;
+                const isSelected = inspectedSlot?.id === slot.id;
                 return (
                   <button
                     key={slot.id}
@@ -320,11 +346,15 @@ export function AdminLiveMapPage() {
                       </span>
                     </div>
 
-                    {slot.notes && (
+                    {slot.current_booking?.plate_snapshot ? (
+                      <div className="mt-1 pt-1 border-t border-border/40 font-mono text-[10px] font-semibold text-primary truncate w-full">
+                        {slot.current_booking.plate_snapshot}
+                      </div>
+                    ) : slot.notes ? (
                       <div className="mt-1 pt-1 border-t border-border/40 font-mono text-[9px] text-muted-foreground truncate w-full">
                         {slot.notes}
                       </div>
-                    )}
+                    ) : null}
                   </button>
                 );
               })}
@@ -344,7 +374,7 @@ export function AdminLiveMapPage() {
             </Badge>
           </div>
 
-          {activeSlot ? (
+          {inspectedSlot ? (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
@@ -352,38 +382,40 @@ export function AdminLiveMapPage() {
                     Selected Bay
                   </span>
                   <div className="font-display text-2xl font-bold text-foreground">
-                    {activeSlot.code}
+                    {inspectedSlot.code}
                   </div>
                 </div>
-                <Badge
-                  variant="outline"
-                  className={cn(
-                    "text-xs font-mono uppercase px-2 py-0.5",
-                    STATUS_CONFIG[activeSlot.admin_status]?.border,
-                    STATUS_CONFIG[activeSlot.admin_status]?.text,
-                  )}
-                >
-                  {STATUS_CONFIG[activeSlot.admin_status]?.label}
-                </Badge>
+                {(() => {
+                  const opStatus = getSlotOperationalStatus(inspectedSlot);
+                  const conf = STATUS_CONFIG[opStatus];
+                  return (
+                    <Badge
+                      variant="outline"
+                      className={cn("text-xs font-mono uppercase px-2 py-0.5", conf.border, conf.text)}
+                    >
+                      {conf.label}
+                    </Badge>
+                  );
+                })()}
               </div>
 
               <div className="divide-y divide-border/60 text-xs">
                 <div className="py-2 flex justify-between">
                   <span className="text-muted-foreground">Facility Level</span>
                   <span className="font-mono font-semibold text-foreground">
-                    Level {activeSlot.level_code}
+                    Level {inspectedSlot.level_code}
                   </span>
                 </div>
                 <div className="py-2 flex justify-between">
                   <span className="text-muted-foreground">Designated Zone</span>
-                  <span className="text-foreground">Zone {activeSlot.zone}</span>
+                  <span className="text-foreground">Zone {inspectedSlot.zone}</span>
                 </div>
                 <div className="py-2 flex justify-between">
                   <span className="text-muted-foreground">Bay Classification</span>
                   <span className="font-medium capitalize text-foreground">
-                    {activeSlot.slot_type === "ev"
+                    {inspectedSlot.slot_type === "ev"
                       ? "EV Fast Charge Bay"
-                      : activeSlot.slot_type === "accessible"
+                      : inspectedSlot.slot_type === "accessible"
                         ? "Accessible Ramp Priority"
                         : "Standard Passenger Vehicle"}
                   </span>
@@ -391,20 +423,47 @@ export function AdminLiveMapPage() {
                 <div className="py-2 flex justify-between">
                   <span className="text-muted-foreground">Base Tariff</span>
                   <span className="font-mono font-semibold text-foreground">
-                    ₹{Math.round(activeSlot.hourly_rate_paise / 100)}/hr
+                    ₹{Math.round(inspectedSlot.hourly_rate_paise / 100)}/hr
                   </span>
                 </div>
                 <div className="py-2 flex justify-between">
                   <span className="text-muted-foreground">EV Fast Charger</span>
                   <span className="font-mono text-foreground">
-                    {activeSlot.has_ev_charger ? "Equipped (60kW / 22kW)" : "No charger"}
+                    {inspectedSlot.has_ev_charger ? "Equipped (60kW / 22kW)" : "No charger"}
                   </span>
                 </div>
-                {activeSlot.notes && (
+
+                {/* Live booking details if occupied */}
+                {inspectedSlot.current_booking && (
+                  <>
+                    <div className="py-2 flex justify-between">
+                      <span className="text-muted-foreground">Active Booking</span>
+                      <span className="font-mono font-semibold text-primary">
+                        {inspectedSlot.current_booking.reference}
+                      </span>
+                    </div>
+                    {inspectedSlot.current_booking.plate_snapshot && (
+                      <div className="py-2 flex justify-between">
+                        <span className="text-muted-foreground">Vehicle Plate</span>
+                        <span className="font-mono font-bold text-foreground">
+                          {inspectedSlot.current_booking.plate_snapshot}
+                        </span>
+                      </div>
+                    )}
+                    <div className="py-2 flex justify-between">
+                      <span className="text-muted-foreground">Window (IST)</span>
+                      <span className="font-mono text-foreground text-[11px]">
+                        {formatIstTime(inspectedSlot.current_booking.start_at)} – {formatIstTime(inspectedSlot.current_booking.end_at)}
+                      </span>
+                    </div>
+                  </>
+                )}
+
+                {inspectedSlot.notes && (
                   <div className="py-2 flex flex-col gap-1">
                     <span className="text-muted-foreground">Admin Notes</span>
                     <span className="text-foreground bg-accent/40 p-2 rounded text-[11px]">
-                      {activeSlot.notes}
+                      {inspectedSlot.notes}
                     </span>
                   </div>
                 )}

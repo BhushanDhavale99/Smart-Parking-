@@ -18,11 +18,7 @@
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background-image: radial-gradient(
-    circle at 50% 20%,
-    var(--primary-glow) 0%,
-    transparent 65%
-  );
+  background-image: radial-gradient(circle at 50% 20%, var(--primary-glow) 0%, transparent 65%);
   opacity: 0.6;
 }
 
@@ -34,11 +30,7 @@
   transform: translateX(-50%);
   width: 800px;
   height: 500px;
-  background: radial-gradient(
-    ellipse,
-    var(--primary-glow) 0%,
-    transparent 75%
-  );
+  background: radial-gradient(ellipse, var(--primary-glow) 0%, transparent 75%);
   pointer-events: none;
   opacity: 0.8;
 }
@@ -224,14 +216,12 @@
   letter-spacing: 0.02em;
   cursor: pointer;
   transition: all 0.24s cubic-bezier(0.16, 1, 0.3, 1);
-  box-shadow:
-    0 4px 16px var(--primary-glow);
+  box-shadow: 0 4px 16px var(--primary-glow);
 }
 
 .login-submit-btn:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow:
-    0 8px 24px var(--primary-glow);
+  box-shadow: 0 8px 24px var(--primary-glow);
   filter: brightness(1.05);
 }
 

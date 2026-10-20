@@ -28,6 +28,7 @@ import parkGridLogo from "@/assets/parkgrid-logo.png";
 import { AnimatedLogo } from "@/components/animated-logo";
 import { ThemeSelector } from "@/components/ThemeSelector";
 import { NavigationProgress } from "@/components/navigation-progress";
+import { useRealtimeSync } from "@/lib/realtime";
 import { RootSplash } from "@/components/root-splash";
 
 /** Lazy-loaded heavy effects — never parsed during the login phase */
@@ -157,6 +158,10 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
       isMounted = false;
     };
   }, [session?.user?.id]);
+
+  // Single app-wide Realtime connection synchronized with user auth state
+  useRealtimeSync(session, isAdmin);
+
   const isHomePage = path === "/";
   const isAuthPage =
     path === "/login" ||
@@ -318,14 +323,19 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
                   <ChevronDown className="size-3 opacity-70 transition-transform duration-200 group-data-[state=open]:rotate-180" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-52 p-1.5 border border-border/80 bg-popover/95 backdrop-blur-xl shadow-xl rounded-lg">
+              <DropdownMenuContent
+                align="start"
+                className="w-52 p-1.5 border border-border/80 bg-popover/95 backdrop-blur-xl shadow-xl rounded-lg"
+              >
                 {supportLinks.map(([to, label]) => (
                   <DropdownMenuItem key={to} asChild>
                     <Link
                       to={to}
                       className={cn(
                         "flex items-center gap-2 cursor-pointer rounded-md px-2.5 py-2 text-xs transition-colors",
-                        isActive(to) ? "bg-primary/15 text-primary font-semibold" : "hover:bg-accent/80 text-foreground",
+                        isActive(to)
+                          ? "bg-primary/15 text-primary font-semibold"
+                          : "hover:bg-accent/80 text-foreground",
                       )}
                     >
                       <ChevronRight className="size-3 text-primary" />
@@ -409,9 +419,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
                     onClick={() => setOpen(false)}
                     className={cn(
                       "flex items-center justify-between rounded-lg px-3.5 py-2.5 text-sm font-medium transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring",
-                      active
-                        ? "bg-primary/10 text-primary font-semibold"
-                        : "text-foreground",
+                      active ? "bg-primary/10 text-primary font-semibold" : "text-foreground",
                     )}
                     style={{ transitionDelay: open ? `${index * 25}ms` : "0ms" }}
                   >
@@ -450,7 +458,9 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
                       "flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm text-muted-foreground transition hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring",
                       path === to && "bg-primary/10 text-primary font-semibold",
                     )}
-                    style={{ transitionDelay: open ? `${(mainLinks.length + index) * 25}ms` : "0ms" }}
+                    style={{
+                      transitionDelay: open ? `${(mainLinks.length + index) * 25}ms` : "0ms",
+                    }}
                   >
                     <ChevronRight className="size-3 text-primary" />
                     {label}
@@ -487,8 +497,8 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
                   <button
                     type="button"
                     onClick={() => {
-                       setOpen(false);
-                       window.dispatchEvent(new CustomEvent("parkgrid-logout"));
+                      setOpen(false);
+                      window.dispatchEvent(new CustomEvent("parkgrid-logout"));
                     }}
                     className="flex w-full items-center gap-2 rounded-lg px-3.5 py-2.5 text-left text-sm text-destructive transition hover:bg-destructive/10"
                   >
@@ -537,7 +547,8 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
               <BrandMark variant="static" />
             </Link>
             <p className="max-w-[260px] text-sm leading-6 text-muted-foreground">
-              BKC Mumbai's premium connected parking facility — intelligent barrier-free entry, high-speed EV charging, and round-the-clock surveillance.
+              BKC Mumbai's premium connected parking facility — intelligent barrier-free entry,
+              high-speed EV charging, and round-the-clock surveillance.
             </p>
             <div className="inline-flex w-fit items-center gap-2 rounded-full border border-available/30 bg-available/10 px-3 py-1 font-mono text-[11px] text-available">
               <span className="live-dot" aria-hidden="true" />
@@ -604,7 +615,9 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
                 <span>
                   Near G-Block, Bandra East
                   <br />
-                  <span className="text-[11px] opacity-70">Automated ANPR entry &amp; exit lanes</span>
+                  <span className="text-[11px] opacity-70">
+                    Automated ANPR entry &amp; exit lanes
+                  </span>
                 </span>
               </li>
               <li className="flex items-start gap-2.5">

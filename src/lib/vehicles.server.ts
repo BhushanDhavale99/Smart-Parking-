@@ -151,11 +151,15 @@ export const createVehicle = createServerFn({ method: "POST" })
       .maybeSingle();
 
     if (error || !newVehicle) {
-      console.error("[createVehicle] Database error:", error.code, error.message);
-      if (error.code === "23505" || error.message.includes("plate")) {
+      if (!error && !newVehicle) {
+        console.error("[createVehicle] Insert returned no data without error (RLS restriction or missing row)");
+        throw new Error("Vehicle registration failed unexpectedly. Please verify your permissions and try again.");
+      }
+      console.error("[createVehicle] Database error:", error?.code, error?.message);
+      if (error?.code === "23505" || error?.message?.includes("plate")) {
         throw new Error("A vehicle with this plate number is already registered to your account.");
       }
-      if (error.code === "P0001" || error.message.includes("limit")) {
+      if (error?.code === "P0001" || error?.message?.includes("limit")) {
         throw new Error(
           "Active vehicle limit reached. You can register a maximum of 5 active vehicles.",
         );
@@ -255,6 +259,10 @@ export const updateVehicle = createServerFn({ method: "POST" })
       .maybeSingle();
 
     if (error || !updatedVehicle) {
+      if (!error && !updatedVehicle) {
+        console.error("[updateVehicle] Update returned no data without error");
+        throw new Error("Vehicle not found, already archived, or access denied.");
+      }
       console.error("[updateVehicle] Database error:", error?.code, error?.message);
       if (error?.code === "23505" || error?.message.includes("plate")) {
         throw new Error("A vehicle with this plate number is already registered to your account.");
@@ -302,6 +310,10 @@ export const setDefaultVehicle = createServerFn({ method: "POST" })
     });
 
     if (error || !vehicle) {
+      if (!error && !vehicle) {
+        console.error("[setDefaultVehicle] RPC returned no data without error");
+        throw new Error("Vehicle not found, already archived, or access denied.");
+      }
       console.error("[setDefaultVehicle] RPC error:", error?.message);
       throw new Error("Vehicle not found or could not be set as default.");
     }
@@ -341,6 +353,10 @@ export const archiveVehicle = createServerFn({ method: "POST" })
       .maybeSingle();
 
     if (error || !archived) {
+      if (!error && !archived) {
+        console.error("[archiveVehicle] Archive returned no data without error");
+        throw new Error("Vehicle not found, already archived, or access denied.");
+      }
       console.error("[archiveVehicle] Error:", error?.message);
       throw new Error("Vehicle not found or already archived.");
     }

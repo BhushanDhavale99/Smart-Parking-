@@ -312,3 +312,54 @@ export const adminListSessions = createServerFn({ method: "GET" })
       pageSize: data.pageSize,
     };
   });
+
+// ── 6. adminActiveSessions ─────────────────────────────────────
+export type AdminActiveSessionRow = {
+  sessionId: string;
+  bookingId: string;
+  bookingReference: string;
+  slotCode: string;
+  levelCode: string;
+  plateSnapshot: string;
+  userFullName: string | null;
+  startedAt: string;
+  bookedEndAt: string;
+  overstayMinutes: number;
+  overstayChargePaise: number;
+  isOverstay: boolean;
+};
+
+export const adminActiveSessions = createServerFn({ method: "GET" }).handler(async () => {
+  const { getRequest } = await import("@tanstack/react-start/server");
+  const request = getRequest();
+  if (!request) throw new Response("Request context missing", { status: 400 });
+
+  const { requireAdmin } = await import("@/lib/auth.server");
+  await requireAdmin(request);
+
+  const client = await getScopedClient(request);
+
+  const { data: rows, error } = await client.rpc("admin_active_sessions");
+
+  if (error) {
+    console.error("[adminActiveSessions] RPC error:", error.message);
+    throw new Error("Failed to load active sessions.");
+  }
+
+  const sessions: AdminActiveSessionRow[] = (rows ?? []).map((r) => ({
+    sessionId: r.session_id,
+    bookingId: r.booking_id,
+    bookingReference: r.booking_reference,
+    slotCode: r.slot_code,
+    levelCode: r.level_code,
+    plateSnapshot: r.plate_snapshot,
+    userFullName: r.user_full_name,
+    startedAt: r.started_at,
+    bookedEndAt: r.booked_end_at,
+    overstayMinutes: Number(r.overstay_minutes ?? 0),
+    overstayChargePaise: Number(r.overstay_charge_paise ?? 0),
+    isOverstay: Boolean(r.is_overstay),
+  }));
+
+  return { sessions };
+});

@@ -557,15 +557,35 @@
     font-family: var(--font-sans);
     font-size: 0.875rem;
     text-transform: none;
-    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    transition:
+      border-color 0.15s ease,
+      box-shadow 0.15s ease;
   }
   .field-input:focus {
     border-color: var(--primary);
     box-shadow: 0 0 0 2px var(--primary-glow);
     outline: none;
   }
+  .field-input,
+  input,
+  select,
+  textarea {
+    pointer-events: auto !important;
+  }
+  input[type="date"],
+  input[type="time"],
+  select {
+    cursor: pointer !important;
+  }
+  input[type="date"]::-webkit-calendar-picker-indicator,
+  input[type="time"]::-webkit-calendar-picker-indicator {
+    cursor: pointer !important;
+    opacity: 1 !important;
+  }
   .parking-grid {
-    background: radial-gradient(ellipse at 50% 30%, oklch(0.5 0.01 240 / 7%) 0%, transparent 75%), var(--surface);
+    background:
+      radial-gradient(ellipse at 50% 30%, oklch(0.5 0.01 240 / 7%) 0%, transparent 75%),
+      var(--surface);
   }
   .road-lane {
     position: relative;

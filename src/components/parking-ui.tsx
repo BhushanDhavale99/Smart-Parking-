@@ -26,10 +26,12 @@ import {
 import { listSlots, type ParkingSlotRow } from "@/lib/parking.server";
 
 const statusClasses: Record<SlotStatus, string> = {
-  available: "border-available/40 bg-available/8 text-available hover:border-available hover:bg-available/15",
+  available:
+    "border-available/40 bg-available/8 text-available hover:border-available hover:bg-available/15",
   occupied: "border-occupied/35 bg-occupied/8 text-occupied opacity-80",
   reserved: "border-reserved/40 bg-reserved/8 text-reserved opacity-85",
-  selected: "border-selected bg-selected/20 text-selected shadow-[0_0_20px_var(--selected-glow)] ring-2 ring-selected/50",
+  selected:
+    "border-selected bg-selected/20 text-selected shadow-[0_0_20px_var(--selected-glow)] ring-2 ring-selected/50",
   maintenance: "border-border/60 bg-muted/40 text-muted-foreground",
   blocked: "border-border/60 bg-muted/40 text-muted-foreground",
 };
@@ -91,7 +93,7 @@ export function StatusBadge({
     no_show: {
       bg: "border-destructive/30 bg-destructive/10 text-destructive",
       dot: "bg-destructive",
-      label: "No Show",
+      label: "No-show",
     },
     expired: {
       bg: "border-border bg-muted/50 text-muted-foreground",
@@ -244,8 +246,8 @@ export function ParkingMap({
               ? "Accessible"
               : "Car";
           const isSlotAvailable = availabilityMap
-            ? (availabilityMap[slot.id] ?? availabilityMap[slot.code] ?? true)
-            : true;
+            ? (availabilityMap[slot.id] ?? availabilityMap[slot.code] ?? !(slot as any).is_occupied)
+            : !(slot as any).is_occupied;
           const status: SlotStatus =
             slot.admin_status !== "active"
               ? "maintenance"
@@ -319,7 +321,11 @@ export function ParkingMap({
         <div className="mb-5 flex flex-col gap-3">
           {/* ── Floor & Zone selectors ── */}
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap gap-1 rounded-xl border border-border/70 bg-background/60 p-1" role="tablist" aria-label="Parking level">
+            <div
+              className="flex flex-wrap gap-1 rounded-xl border border-border/70 bg-background/60 p-1"
+              role="tablist"
+              aria-label="Parking level"
+            >
               {ORDERED_LEVELS.map((code) => {
                 const conf = LEVEL_CONFIG[code];
                 const isSelected = level === code;
@@ -349,7 +355,11 @@ export function ParkingMap({
               })}
             </div>
             {/* ── Zone selector ── */}
-            <div className="flex gap-1 rounded-xl border border-border/70 bg-background/60 p-1" role="tablist" aria-label="Parking zone">
+            <div
+              className="flex gap-1 rounded-xl border border-border/70 bg-background/60 p-1"
+              role="tablist"
+              aria-label="Parking zone"
+            >
               {(["All", "A", "B", "EV"] as const).map((item) => (
                 <Button
                   key={item}
@@ -430,7 +440,9 @@ export function ParkingMap({
       </p>
       <div className="road-lane my-4 flex h-14 items-center justify-around rounded-xl border-y border-dashed border-road-line/30 bg-road/75 text-road-line shadow-inner">
         <ArrowDown className="size-4 rotate-90" />
-        <span className="font-mono text-[10px] uppercase tracking-widest font-semibold">Drive lane · 8 km/h</span>
+        <span className="font-mono text-[10px] uppercase tracking-widest font-semibold">
+          Drive lane · 8 km/h
+        </span>
         <ArrowDown className="size-4 rotate-90" />
       </div>
       <div className="flex flex-wrap items-center justify-between gap-y-2 text-[11px] text-muted-foreground">

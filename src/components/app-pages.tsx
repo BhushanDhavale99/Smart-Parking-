@@ -87,6 +87,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 /** Inline replay helper — avoids statically importing the 24 KB OpeningAnimation module */
 function replayParkingIntro() {
   if (typeof window !== "undefined") {
@@ -379,10 +380,40 @@ function ParkingBooking({ initialSlot }: { initialSlot: ParkingSlotData }) {
     return `${hour}:${minute}`;
   }, []);
 
-  const [date, setDate] = useState(todayIst);
-  const [arrival, setArrival] = useState(() => getNext15MinIstTime());
+  const [date, setDate] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = sessionStorage.getItem("parkgrid_selected_date");
+      if (saved) return saved;
+    }
+    return todayIst;
+  });
+  const [arrival, setArrival] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = sessionStorage.getItem("parkgrid_selected_arrival");
+      if (saved) return saved;
+    }
+    return getNext15MinIstTime();
+  });
   const [level, setLevel] = useState<LevelCode>(initialSlot.levelCode ?? "G1");
 
+  const timeSlots = useMemo(() => {
+    const slots: string[] = [];
+    for (let h = 0; h < 24; h++) {
+      for (let m = 0; m < 60; m += 15) {
+        slots.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
+      }
+    }
+    return slots;
+  }, []);
+
+  const displayTimeSlots = useMemo(() => {
+    if (arrival && !timeSlots.includes(arrival)) {
+      return [...timeSlots, arrival].sort();
+    }
+    return timeSlots;
+  }, [timeSlots, arrival]);
+
+  const isPastDate = date < todayIst;
   const isPastArrival = date === todayIst && arrival < getNowIstTime();
 
   const handleSlotsLoaded = useCallback((loaded: ParkingSlotData[]) => {
@@ -460,7 +491,9 @@ function ParkingBooking({ initialSlot }: { initialSlot: ParkingSlotData }) {
   const taxPaise = quoteQuery.data?.gst_paise ?? fallbackTax;
   const totalPaise = quoteQuery.data?.total_paise ?? fallbackTotal;
 
-  const valid = Boolean(date && arrival && duration > 0 && isSelectedAvailable && !isPastArrival);
+  const valid = Boolean(
+    date && arrival && duration > 0 && isSelectedAvailable && !isPastArrival && !isPastDate,
+  );
 
   const updateSlot = (slot: ParkingSlotData) => {
     setSelected(slot);
@@ -506,31 +539,55 @@ function ParkingBooking({ initialSlot }: { initialSlot: ParkingSlotData }) {
           <input
             required
             type="date"
-            min={todayIst}
             value={date}
             onChange={(event) => {
               const newDate = event.target.value;
               setDate(newDate);
-              if (newDate === todayIst && arrival < getNowIstTime()) {
-                setArrival(getNext15MinIstTime());
+              if (typeof window !== "undefined") {
+                sessionStorage.setItem("parkgrid_selected_date", newDate);
               }
             }}
-            className="field-input rounded-xl"
+            onClick={(e) => {
+              try {
+                e.currentTarget.showPicker?.();
+              } catch (err) {
+                void err;
+              }
+            }}
+            className="field-input rounded-xl cursor-pointer"
           />
+          {isPastDate && (
+            <p className="mt-1 text-xs font-semibold text-destructive">
+              Booking date cannot be in the past.
+            </p>
+          )}
         </label>
         <label className="field-label flex flex-col gap-1.5">
           <span className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
             <Clock3 className="size-3.5 text-primary" />
             Arrival Time (IST)
           </span>
-          <input
+          <select
             required
-            type="time"
-            min={date === todayIst ? getNowIstTime() : undefined}
             value={arrival}
-            onChange={(event) => setArrival(event.target.value)}
-            className="field-input rounded-xl"
-          />
+            onChange={(event) => {
+              const newArrival = event.target.value;
+              setArrival(newArrival);
+              if (typeof window !== "undefined") {
+                sessionStorage.setItem("parkgrid_selected_arrival", newArrival);
+              }
+            }}
+            className="field-input rounded-xl cursor-pointer"
+          >
+            {displayTimeSlots.map((slot) => {
+              const isPast = date === todayIst && slot < getNowIstTime();
+              return (
+                <option key={slot} value={slot}>
+                  {slot} {isPast ? "(Past)" : ""}
+                </option>
+              );
+            })}
+          </select>
           {isPastArrival && (
             <p className="mt-1 text-xs font-semibold text-destructive">
               Arrival time cannot be in the past.
@@ -564,7 +621,10 @@ function ParkingBooking({ initialSlot }: { initialSlot: ParkingSlotData }) {
           onLevelChange={setLevel}
         />
         <aside className="space-y-4">
-          <div key={selected.id} className="selection-pulse rounded-2xl border border-border/80 bg-surface/95 p-6 shadow-sm">
+          <div
+            key={selected.id}
+            className="selection-pulse rounded-2xl border border-border/80 bg-surface/95 p-6 shadow-sm"
+          >
             <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
               Selected bay
             </p>
@@ -861,7 +921,9 @@ export function VehiclesPage() {
           {vehicles.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-border/80 bg-surface/40 p-12 text-center shadow-sm">
               <CarFront className="mx-auto size-12 text-muted-foreground/60" />
-              <h3 className="mt-4 font-display text-xl font-semibold">No vehicles registered yet</h3>
+              <h3 className="mt-4 font-display text-xl font-semibold">
+                No vehicles registered yet
+              </h3>
               <p className="mt-2 text-sm text-muted-foreground max-w-md mx-auto">
                 Register your vehicle to automate bay selection, access EV chargers, and speed up
                 checkout.
@@ -1486,7 +1548,9 @@ export function CheckoutPage() {
               </div>
               <div className="bg-card p-4">
                 <span className="text-xs text-muted-foreground">Date</span>
-                <strong className="mt-1 block text-sm font-semibold">{formatIstDate(activeStartAt)}</strong>
+                <strong className="mt-1 block text-sm font-semibold">
+                  {formatIstDate(activeStartAt)}
+                </strong>
               </div>
               <div className="bg-card p-4">
                 <span className="text-xs text-muted-foreground">Arrival Window</span>
@@ -1525,9 +1589,15 @@ export function CheckoutPage() {
             <div className="mt-6 flex items-center gap-3.5 rounded-xl border border-available/35 bg-available/10 p-4 shadow-xs">
               <ShieldCheck className="size-6 text-available shrink-0" />
               <p className="text-sm">
-                <strong className="block font-semibold text-foreground">Your space is securely held</strong>
+                <strong className="block font-semibold text-foreground">
+                  Your space is securely held
+                </strong>
                 <span className="text-muted-foreground">
-                  Hold timer: <span className="font-mono font-semibold text-foreground">{holdMinutes}:{holdRemainderSecs.toString().padStart(2, "0")}</span> remaining. Complete payment to confirm reservation.
+                  Hold timer:{" "}
+                  <span className="font-mono font-semibold text-foreground">
+                    {holdMinutes}:{holdRemainderSecs.toString().padStart(2, "0")}
+                  </span>{" "}
+                  remaining. Complete payment to confirm reservation.
                 </span>
               </p>
             </div>
@@ -1871,7 +1941,9 @@ Status: CONFIRMED (PAID)`,
             {!copied && <Copy className="size-3.5" />}
           </Button>
         </div>
-        <h2 className="mt-2 font-display text-5xl sm:text-6xl font-bold tracking-tight text-foreground">{slotCode}</h2>
+        <h2 className="mt-2 font-display text-5xl sm:text-6xl font-bold tracking-tight text-foreground">
+          {slotCode}
+        </h2>
         <p className="mt-2 text-sm text-muted-foreground">
           {dateStr} · {timeStr} · Level {levelCode}
         </p>
@@ -1918,7 +1990,9 @@ Status: CONFIRMED (PAID)`,
           <QRCodeSVG value={refCode} size={184} />
           <span className="qr-scan-line" />
         </div>
-        <p className="mt-4 text-xs font-medium text-muted-foreground">Scan at the entry gate barrier for instant access</p>
+        <p className="mt-4 text-xs font-medium text-muted-foreground">
+          Scan at the entry gate barrier for instant access
+        </p>
         <div className="mt-8 flex flex-wrap justify-center gap-2">
           <Link to="/bookings">
             <Button>View my bookings</Button>
@@ -2552,15 +2626,35 @@ export function BookingsPage() {
                   >
                     <Button>QR Pass</Button>
                   </Link>
-                  {(b.status === "confirmed" || b.status === "reserved") && (
-                    <Button
-                      variant="outline"
-                      className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-                      onClick={() => setCancelTarget(b)}
-                    >
-                      Cancel
-                    </Button>
-                  )}
+                  {(b.status === "confirmed" || b.status === "reserved") &&
+                    (new Date(b.start_at).getTime() <= Date.now() ? (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span tabIndex={0} className="inline-block">
+                              <Button
+                                variant="outline"
+                                disabled
+                                className="text-muted-foreground opacity-50 cursor-not-allowed"
+                              >
+                                Cancel
+                              </Button>
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Already started</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        onClick={() => setCancelTarget(b)}
+                      >
+                        Cancel
+                      </Button>
+                    ))}
                 </div>
               </article>
             ))}
@@ -2747,7 +2841,9 @@ export function LocationPage() {
       <div className="grid gap-6 lg:grid-cols-[1.15fr_.85fr]">
         <div className="location-map relative min-h-[480px] overflow-hidden rounded-2xl border border-border/80 bg-surface shadow-sm">
           <div className="absolute left-[18%] top-[18%] rounded-full border border-primary/40 bg-background/95 px-3 py-1 shadow-lg backdrop-blur">
-            <span className="font-mono text-[10px] font-semibold uppercase tracking-wider text-primary">Entrance Lane</span>
+            <span className="font-mono text-[10px] font-semibold uppercase tracking-wider text-primary">
+              Entrance Lane
+            </span>
           </div>
           <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-selected/40 bg-background/90 p-8 text-center shadow-2xl backdrop-blur-md">
             <CarFront className="mx-auto size-9 text-selected" />
@@ -2755,7 +2851,9 @@ export function LocationPage() {
             <span className="font-mono text-xs text-muted-foreground">G-Block, BKC</span>
           </div>
           <div className="absolute bottom-[15%] right-[18%] rounded-full border border-available/40 bg-background/95 px-3 py-1 shadow-lg backdrop-blur">
-            <span className="font-mono text-[10px] font-semibold uppercase tracking-wider text-available">Exit Barrier</span>
+            <span className="font-mono text-[10px] font-semibold uppercase tracking-wider text-available">
+              Exit Barrier
+            </span>
           </div>
         </div>
         <div className="space-y-4">
@@ -3286,7 +3384,10 @@ export function AdminPage() {
           <div className="divide-y divide-border/60 rounded-2xl border border-border/80 bg-surface/95 shadow-sm overflow-hidden">
             {["SP-10231 · A12", "SP-10230 · E04", "SP-10229 · B16", "SP-10228 · A08"].map(
               (b, i) => (
-                <div key={b} className="flex items-center justify-between p-4 transition-colors hover:bg-muted/20">
+                <div
+                  key={b}
+                  className="flex items-center justify-between p-4 transition-colors hover:bg-muted/20"
+                >
                   <div>
                     <strong className="font-mono text-sm">{b}</strong>
                     <p className="text-xs text-muted-foreground mt-0.5">
@@ -3568,10 +3669,7 @@ export function NotificationsPage() {
     <PageFrame eyebrow="Updates" title="Notifications">
       <div className="max-w-4xl divide-y divide-border/60 rounded-2xl border border-border/80 bg-surface/95 shadow-sm overflow-hidden">
         {rows.map(([title, copy, time, NoticeIcon]) => (
-          <div
-            key={title}
-            className="flex gap-4 p-5 transition-colors hover:bg-muted/20"
-          >
+          <div key={title} className="flex gap-4 p-5 transition-colors hover:bg-muted/20">
             <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary border border-primary/20 shadow-sm">
               <NoticeIcon className="size-4" />
             </span>
@@ -3579,7 +3677,9 @@ export function NotificationsPage() {
               <strong className="block text-sm font-semibold">{title}</strong>
               <p className="mt-0.5 text-sm text-muted-foreground leading-relaxed">{copy}</p>
             </div>
-            <time className="shrink-0 font-mono text-[11px] text-muted-foreground pt-0.5">{time}</time>
+            <time className="shrink-0 font-mono text-[11px] text-muted-foreground pt-0.5">
+              {time}
+            </time>
           </div>
         ))}
       </div>

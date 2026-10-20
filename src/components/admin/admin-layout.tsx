@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { Component, useState, useEffect, type ErrorInfo, type ReactNode } from "react";
 import { Link, Outlet, useRouterState, useNavigate } from "@tanstack/react-router";
 import {
   LayoutDashboard,
@@ -7,22 +7,20 @@ import {
   CalendarCheck,
   Activity,
   Users,
-  BookOpen,
   CreditCard,
-  Tag,
   Settings,
+  TrendingUp,
   LogOut,
   Menu,
   X,
   ExternalLink,
-  Search,
   PanelLeftClose,
   PanelLeftOpen,
+  AlertTriangle,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import parkGridLogo from "@/assets/parkgrid-logo.png";
 import { AnimatedLogo } from "@/components/animated-logo";
@@ -33,7 +31,6 @@ interface NavItem {
   icon: typeof LayoutDashboard;
   exact?: boolean;
   badge?: string;
-  comingSoon?: boolean;
 }
 
 const NAV_GROUPS: { group: string; items: NavItem[] }[] = [
@@ -50,16 +47,10 @@ const NAV_GROUPS: { group: string; items: NavItem[] }[] = [
   {
     group: "Management",
     items: [
-      { to: "/admin/users", label: "Users & Accounts", icon: Users, badge: "Live DB" },
-      { to: "/admin/payments", label: "Payments", icon: CreditCard, comingSoon: true },
-      { to: "/admin/pricing", label: "Pricing rules", icon: Tag, comingSoon: true },
-    ],
-  },
-  {
-    group: "System",
-    items: [
-      { to: "/admin/knowledge", label: "Knowledge Base", icon: BookOpen },
-      { to: "/admin/settings", label: "Settings", icon: Settings, comingSoon: true },
+      { to: "/admin/users", label: "Users & Accounts", icon: Users },
+      { to: "/admin/payments", label: "Payments", icon: CreditCard },
+      { to: "/admin/revenue", label: "Revenue", icon: TrendingUp },
+      { to: "/admin/settings", label: "Settings", icon: Settings },
     ],
   },
 ];
@@ -72,10 +63,67 @@ const ROUTE_TITLES: Record<string, string> = {
   "/admin/sessions": "Sessions",
   "/admin/users": "Users & Accounts",
   "/admin/payments": "Payments",
-  "/admin/pricing": "Pricing rules",
-  "/admin/knowledge": "Knowledge Base",
+  "/admin/revenue": "Revenue",
   "/admin/settings": "Settings",
 };
+
+interface ErrorBoundaryProps {
+  children: ReactNode;
+  fallbackKey?: string;
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+}
+
+class AdminErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, error };
+  }
+
+  override componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error("[AdminErrorBoundary]:", error, errorInfo);
+  }
+
+  override componentDidUpdate(prevProps: ErrorBoundaryProps) {
+    if (prevProps.fallbackKey !== this.props.fallbackKey && this.state.hasError) {
+      this.setState({ hasError: false, error: null });
+    }
+  }
+
+  override render() {
+    if (this.state.hasError) {
+      return (
+        <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-8 text-center space-y-4 max-w-lg mx-auto my-8">
+          <div className="size-12 rounded-full bg-destructive/20 text-destructive flex items-center justify-center mx-auto">
+            <AlertTriangle className="size-6" />
+          </div>
+          <div>
+            <h2 className="text-base font-semibold text-foreground">Something went wrong</h2>
+            <p className="text-xs text-muted-foreground mt-1">
+              {this.state.error?.message || "An unexpected error occurred while loading this view."}
+            </p>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => this.setState({ hasError: false, error: null })}
+            className="text-xs"
+          >
+            Retry View
+          </Button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 export function AdminLayout({ children }: { children?: React.ReactNode }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -150,16 +198,6 @@ export function AdminLayout({ children }: { children?: React.ReactNode }) {
               <span>/</span>
               <span className="text-foreground font-medium">{currentTitle}</span>
             </div>
-          </div>
-
-          {/* Center: Global Search Placeholder (Coming soon) */}
-          <div className="hidden md:flex items-center relative w-64 lg:w-72">
-            <Search className="absolute left-2.5 size-3.5 text-muted-foreground/60" />
-            <Input
-              disabled
-              placeholder="Search console (coming soon)..."
-              className="h-8 pl-8 text-xs bg-muted/20 border-border/80 text-muted-foreground cursor-not-allowed"
-            />
           </div>
 
           {/* Right: Email with badge, View member site, Log out */}
@@ -287,11 +325,6 @@ export function AdminLayout({ children }: { children?: React.ReactNode }) {
                           {item.badge}
                         </span>
                       )}
-                      {!collapsed && item.comingSoon && (
-                        <span className="rounded bg-muted/60 text-muted-foreground font-mono text-[9px] px-1 py-0.2">
-                          Soon
-                        </span>
-                      )}
                     </Link>
                   );
                 })}
@@ -300,33 +333,40 @@ export function AdminLayout({ children }: { children?: React.ReactNode }) {
           </nav>
         </aside>
 
-        {/* Mobile Drawer */}
+        {/* Mobile Sidebar Overlay */}
         {mobileMenuOpen && (
           <div
-            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm lg:hidden pt-14"
+            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm lg:hidden"
             onClick={() => setMobileMenuOpen(false)}
           >
             <div
-              className="bg-background border-r border-border w-72 max-w-[85vw] h-full p-4 overflow-y-auto shadow-2xl flex flex-col justify-between"
+              className="fixed inset-y-0 left-0 w-72 bg-background border-r border-border p-4 flex flex-col justify-between"
               onClick={(e) => e.stopPropagation()}
             >
               <div>
-                <div className="flex items-center justify-between pb-3 border-b border-border mb-4">
-                  <div className="flex items-center gap-2">
-                    <div className="grid size-7 shrink-0 place-items-center overflow-hidden rounded-md border border-primary/30 bg-background">
+                <div className="flex items-center justify-between pb-4 border-b border-border">
+                  <div className="flex items-center gap-2.5">
+                    <div className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-lg border border-primary/30 bg-background">
                       <AnimatedLogo
                         src={parkGridLogo}
                         alt="ParkGrid"
-                        preset="static"
+                        preset="small"
                         className="size-full"
                         imgClassName="object-cover"
                       />
                     </div>
-                    <span className="font-display font-semibold text-sm">Navigation</span>
+                    <div className="leading-tight">
+                      <span className="block font-display text-xs font-semibold tracking-wider text-foreground">
+                        PARKGRID
+                      </span>
+                      <span className="font-mono text-[8px] uppercase tracking-wider text-muted-foreground">
+                        Console
+                      </span>
+                    </div>
                   </div>
                   <Button
-                    size="icon"
                     variant="ghost"
+                    size="icon"
                     className="size-7"
                     onClick={() => setMobileMenuOpen(false)}
                   >
@@ -334,7 +374,7 @@ export function AdminLayout({ children }: { children?: React.ReactNode }) {
                   </Button>
                 </div>
 
-                <div className="space-y-5">
+                <div className="py-4 space-y-6">
                   {NAV_GROUPS.map((group) => (
                     <div key={group.group} className="space-y-1">
                       <span className="block px-2 pb-1 text-[10px] font-mono uppercase tracking-wider text-muted-foreground font-semibold">
@@ -364,11 +404,6 @@ export function AdminLayout({ children }: { children?: React.ReactNode }) {
                                 {item.badge}
                               </span>
                             )}
-                            {item.comingSoon && (
-                              <span className="rounded bg-muted/60 text-muted-foreground font-mono text-[9px] px-1 py-0.2">
-                                Soon
-                              </span>
-                            )}
                           </Link>
                         );
                       })}
@@ -392,7 +427,7 @@ export function AdminLayout({ children }: { children?: React.ReactNode }) {
 
         {/* Main Content Area */}
         <main className="flex-1 p-4 sm:p-6 lg:p-8 min-w-0 overflow-y-auto">
-          {children || <Outlet />}
+          <AdminErrorBoundary fallbackKey={pathname}>{children || <Outlet />}</AdminErrorBoundary>
         </main>
       </div>
     </div>

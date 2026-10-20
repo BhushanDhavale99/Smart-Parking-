@@ -69,8 +69,8 @@ async function resolveSlotUuid(
 
 // ── 1. getAvailability ───────────────────────────────────────
 const availabilitySchema = z.object({
-  start_at: z.string().datetime(),
-  end_at: z.string().datetime(),
+  start_at: z.string().datetime({ offset: true }),
+  end_at: z.string().datetime({ offset: true }),
   level: z.string().optional().nullable(),
   zone: z.string().optional().nullable(),
   slot_type: z.string().optional().nullable(),
@@ -107,8 +107,8 @@ export const getAvailability = createServerFn({ method: "GET" })
 // ── 2. quoteBooking ──────────────────────────────────────────
 const quoteSchema = z.object({
   slot_id: z.string().min(1),
-  start_at: z.string().datetime(),
-  end_at: z.string().datetime(),
+  start_at: z.string().datetime({ offset: true }),
+  end_at: z.string().datetime({ offset: true }),
 });
 
 export const quoteBooking = createServerFn({ method: "GET" })
@@ -153,8 +153,8 @@ export const quoteBooking = createServerFn({ method: "GET" })
 const createBookingSchema = z.object({
   slot_id: z.string().min(1),
   vehicle_id: z.string().uuid(),
-  start_at: z.string().datetime(),
-  end_at: z.string().datetime(),
+  start_at: z.string().datetime({ offset: true }),
+  end_at: z.string().datetime({ offset: true }),
 });
 
 export const createBooking = createServerFn({ method: "POST" })
@@ -225,6 +225,7 @@ export const listMyBookings = createServerFn({ method: "GET" })
 
     const client = await getScopedClient(request);
     await client.rpc("expire_stale_holds");
+    await client.rpc("expire_unused_bookings");
 
     const nowIso = new Date().toISOString();
     let query = client
@@ -247,13 +248,11 @@ export const listMyBookings = createServerFn({ method: "GET" })
         .gte("end_at", nowIso)
         .order("end_at", { ascending: true });
     } else if (data.statusTab === "Completed") {
-      query = query
-        .or(`status.eq.completed,and(status.in.(confirmed,active),end_at.lt.${nowIso})`)
-        .order("end_at", { ascending: false });
+      query = query.in("status", ["completed", "no_show"]).order("end_at", { ascending: false });
     } else {
       // Cancelled
       query = query
-        .in("status", ["cancelled", "expired", "no_show"])
+        .in("status", ["cancelled", "expired"])
         .order("created_at", { ascending: false });
     }
 
@@ -339,8 +338,12 @@ export const getCancellationPreview = createServerFn({ method: "GET" })
     });
 
     if (error || !rows || rows.length === 0) {
-      console.error("[getCancellationPreview] RPC error:", error?.message);
-      throw new Error("Unable to calculate refund preview.");
+      console.error("[getCancellationPreview] RPC error details:", {
+        message: error?.message,
+        code: error?.code,
+        hint: error?.hint,
+      });
+      throw new Error(error?.message || "Unable to calculate refund preview.");
     }
 
     const preview = rows[0];
@@ -374,6 +377,7 @@ export const cancelBooking = createServerFn({ method: "POST" })
     await requireUser(request);
 
     const client = await getScopedClient(request);
+    await client.rpc("expire_unused_bookings");
 
     const { data: booking, error } = await client.rpc("cancel_booking", {
       p_booking_id: data.booking_id,
@@ -381,8 +385,36 @@ export const cancelBooking = createServerFn({ method: "POST" })
     });
 
     if (error || !booking) {
-      console.error("[cancelBooking] RPC error:", error?.message);
-      throw new Error("Failed to cancel reservation.");
+      console.error("[cancelBooking] RPC error details:", {
+        message: error?.message,
+        code: error?.code,
+        hint: error?.hint,
+        details: error?.details,
+      });
+
+      const msg = (error?.message || "").toLowerCase();
+      if (msg.includes("already started") || msg.includes("start_at") || msg.includes("past")) {
+        throw new Error("This booking has already started and cannot be cancelled.");
+      }
+      if (msg.includes("ongoing") || msg.includes("session")) {
+        throw new Error("This booking has an active parking session and cannot be cancelled.");
+      }
+      if (
+        msg.includes("already completed") ||
+        msg.includes("already cancelled") ||
+        msg.includes("already expired") ||
+        msg.includes("already no_show") ||
+        msg.includes("cannot cancel")
+      ) {
+        throw new Error("This booking cannot be cancelled because it is no longer active.");
+      }
+      if (msg.includes("access denied") || msg.includes("unauthorized")) {
+        throw new Error("You do not have permission to cancel this booking.");
+      }
+      if (msg.includes("booking not found")) {
+        throw new Error("Booking not found.");
+      }
+      throw new Error("This booking cannot be cancelled.");
     }
 
     return { booking };
@@ -393,8 +425,10 @@ const adminListBookingsSchema = z.object({
   status: z.string().default("All"),
   payment_status: z.string().default("All"),
   search: z.string().default(""),
+  dateFrom: z.string().optional(),
+  dateTo: z.string().optional(),
   page: z.number().int().min(1).default(1),
-  pageSize: z.number().int().min(1).max(100).default(10),
+  pageSize: z.number().int().min(1).max(50).default(10),
 });
 
 export const adminListBookings = createServerFn({ method: "GET" })
@@ -409,6 +443,7 @@ export const adminListBookings = createServerFn({ method: "GET" })
 
     const client = await getScopedClient(request);
     await client.rpc("expire_stale_holds");
+    await client.rpc("expire_unused_bookings");
 
     let query = client
       .from("bookings")
@@ -425,6 +460,14 @@ export const adminListBookings = createServerFn({ method: "GET" })
       query = query.eq("payment_status", data.payment_status as BookingRow["payment_status"]);
     }
 
+    if (data.dateFrom) {
+      query = query.gte("created_at", data.dateFrom);
+    }
+
+    if (data.dateTo) {
+      query = query.lte("created_at", data.dateTo);
+    }
+
     if (data.search.trim()) {
       const q = data.search.trim();
       query = query.or(`reference.ilike.%${q}%,plate_snapshot.ilike.%${q}%`);
@@ -432,8 +475,9 @@ export const adminListBookings = createServerFn({ method: "GET" })
 
     query = query.order("created_at", { ascending: false });
 
-    const from = (data.page - 1) * data.pageSize;
-    const to = from + data.pageSize - 1;
+    const limit = Math.min(data.pageSize, 50);
+    const from = (data.page - 1) * limit;
+    const to = from + limit - 1;
     query = query.range(from, to);
 
     const { data: bookings, count, error } = await query;
@@ -444,13 +488,91 @@ export const adminListBookings = createServerFn({ method: "GET" })
     }
 
     const totalCount = count ?? 0;
-    const totalPages = Math.ceil(totalCount / data.pageSize) || 1;
+    const totalPages = Math.ceil(totalCount / limit) || 1;
 
     return {
       bookings: bookings ?? [],
       totalCount,
       totalPages,
       page: data.page,
-      pageSize: data.pageSize,
+      pageSize: limit,
     };
+  });
+
+// ── 10. adminGetBooking ───────────────────────────────────────
+const adminGetBookingSchema = z.object({
+  booking_id: z.string().uuid(),
+});
+
+export const adminGetBooking = createServerFn({ method: "GET" })
+  .validator((params: unknown) => safeValidate(adminGetBookingSchema, params))
+  .handler(async ({ data }) => {
+    const { getRequest } = await import("@tanstack/react-start/server");
+    const request = getRequest();
+    if (!request) throw new Response("Request context missing", { status: 400 });
+
+    const { requireAdmin } = await import("@/lib/auth.server");
+    await requireAdmin(request);
+
+    const client = await getScopedClient(request);
+
+    const { data: booking, error } = await client
+      .from("bookings")
+      .select(
+        `
+        *,
+        parking_slots (*),
+        vehicles (*),
+        profiles (id, full_name, phone, role),
+        payments (*),
+        payment_refunds (*),
+        parking_sessions (*)
+      `,
+      )
+      .eq("id", data.booking_id)
+      .maybeSingle();
+
+    if (error || !booking) {
+      console.error("[adminGetBooking] Error:", error?.message);
+      throw new Error("Booking not found.");
+    }
+
+    return { booking };
+  });
+
+// ── 11. adminOverrideBooking ──────────────────────────────────
+const adminOverrideBookingSchema = z.object({
+  booking_id: z.string().uuid(),
+  action: z.enum(["cancel_full_refund", "cancel_by_policy", "cancel_no_refund", "mark_no_show"]),
+  reason: z
+    .string()
+    .trim()
+    .min(5, "Reason must be at least 5 characters")
+    .max(300, "Reason cannot exceed 300 characters"),
+});
+
+export const adminOverrideBooking = createServerFn({ method: "POST" })
+  .validator((params: unknown) => safeValidate(adminOverrideBookingSchema, params))
+  .handler(async ({ data }) => {
+    const { getRequest } = await import("@tanstack/react-start/server");
+    const request = getRequest();
+    if (!request) throw new Response("Request context missing", { status: 400 });
+
+    const { requireAdmin } = await import("@/lib/auth.server");
+    await requireAdmin(request);
+
+    const client = await getScopedClient(request);
+
+    const { data: updatedBooking, error } = await client.rpc("admin_override_booking", {
+      p_booking_id: data.booking_id,
+      p_action: data.action,
+      p_reason: data.reason,
+    });
+
+    if (error) {
+      console.error("[adminOverrideBooking] RPC error:", error.message);
+      throw new Error(error.message || "Failed to override booking.");
+    }
+
+    return { booking: updatedBooking };
   });

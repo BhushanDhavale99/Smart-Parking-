@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Search,
   ArrowUpRight,
@@ -32,7 +33,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { listSlots, adminUpdateSlot, type ParkingSlotRow } from "@/lib/parking.server";
+import { adminUpdateSlot, type ParkingSlotWithOccupancy } from "@/lib/parking.server";
+import { useParkingSlots, invalidateBookingRelatedQueries } from "@/hooks/useBookings";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin/slots")({
@@ -52,6 +54,7 @@ export const Route = createFileRoute("/admin/slots")({
 });
 
 export function AdminSlotsPage() {
+  const queryClient = useQueryClient();
   const [levelFilter, setLevelFilter] = useState<string>("All");
   const [statusFilter, setStatusFilter] = useState<string>("All");
   const [typeFilter, setTypeFilter] = useState<string>("All");
@@ -59,14 +62,9 @@ export function AdminSlotsPage() {
   const [debouncedSearch, setDebouncedSearch] = useState<string>("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(15);
-  const [slots, setSlots] = useState<ParkingSlotRow[]>([]);
-  const [totalCount, setTotalCount] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
-  const [loading, setLoading] = useState(true);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Status Change Dialog State
-  const [editingSlot, setEditingSlot] = useState<ParkingSlotRow | null>(null);
+  const [editingSlot, setEditingSlot] = useState<ParkingSlotWithOccupancy | null>(null);
   const [targetStatus, setTargetStatus] = useState<"active" | "maintenance" | "blocked">("active");
   const [targetNotes, setTargetNotes] = useState<string>("");
   const [isUpdating, setIsUpdating] = useState(false);
@@ -80,36 +78,36 @@ export function AdminSlotsPage() {
     return () => clearTimeout(handler);
   }, [searchQuery]);
 
-  const loadSlots = useCallback(async () => {
-    setLoading(true);
-    setErrorMsg(null);
-    try {
-      const res = await listSlots({
-        data: {
-          level: levelFilter as "All" | "B2" | "B1" | "G1" | "L1" | "L2",
-          slot_type: typeFilter as "All" | "standard" | "ev" | "accessible",
-          admin_status: statusFilter as "All" | "active" | "maintenance" | "blocked",
-          search: debouncedSearch,
-          page,
-          pageSize,
-        },
-      });
-      setSlots(res.slots as unknown as ParkingSlotRow[]);
-      setTotalCount(res.totalCount);
-      setTotalPages(res.totalPages);
-    } catch (err: unknown) {
-      console.error("[AdminSlotsPage] Error fetching slots:", err);
-      setErrorMsg("Failed to load parking slots. Please check your database connection or retry.");
-    } finally {
-      setLoading(false);
+  const {
+    data: slotsData,
+    isLoading: loading,
+    error: queryError,
+    refetch,
+    isFetching,
+  } = useParkingSlots({
+    level: levelFilter as "All" | "B2" | "B1" | "G1" | "L1" | "L2",
+    slot_type: typeFilter as "All" | "standard" | "ev" | "accessible",
+    admin_status: statusFilter === "occupied" ? "All" : (statusFilter as "All" | "active" | "maintenance" | "blocked"),
+    search: debouncedSearch,
+    page,
+    pageSize,
+  });
+
+  const rawSlots = (slotsData?.slots ?? []) as ParkingSlotWithOccupancy[];
+  const slots = useMemo(() => {
+    if (statusFilter === "occupied") {
+      return rawSlots.filter((s) => s.is_occupied);
     }
-  }, [levelFilter, typeFilter, statusFilter, debouncedSearch, page, pageSize]);
+    return rawSlots;
+  }, [rawSlots, statusFilter]);
 
-  useEffect(() => {
-    loadSlots();
-  }, [loadSlots]);
+  const totalCount = statusFilter === "occupied" ? slots.length : (slotsData?.totalCount ?? 0);
+  const totalPages = statusFilter === "occupied" ? 1 : (slotsData?.totalPages ?? 1);
+  const errorMsg = queryError
+    ? "Failed to load parking slots. Please check your database connection or retry."
+    : null;
 
-  const openStatusDialog = (slot: ParkingSlotRow) => {
+  const openStatusDialog = (slot: ParkingSlotWithOccupancy) => {
     setEditingSlot(slot);
     setTargetStatus(slot.admin_status);
     setTargetNotes(slot.notes ?? "");
@@ -128,7 +126,7 @@ export function AdminSlotsPage() {
       });
       toast.success(`Bay ${editingSlot.code} status updated to ${targetStatus}`);
       setEditingSlot(null);
-      await loadSlots();
+      invalidateBookingRelatedQueries(queryClient);
     } catch (err: unknown) {
       console.error("[AdminSlotsPage] Status update failed:", err);
       toast.error("Failed to update slot status");
@@ -164,11 +162,11 @@ export function AdminSlotsPage() {
           <Button
             size="sm"
             variant="outline"
-            onClick={loadSlots}
-            disabled={loading}
+            onClick={() => refetch()}
+            disabled={isFetching}
             className="h-8 text-xs gap-1.5"
           >
-            <RefreshCw className={`size-3.5 ${loading ? "animate-spin" : ""}`} />
+            <RefreshCw className={`size-3.5 ${isFetching ? "animate-spin" : ""}`} />
             Refresh
           </Button>
 
@@ -238,6 +236,7 @@ export function AdminSlotsPage() {
           >
             <option value="All">All Statuses</option>
             <option value="active">Active (Available)</option>
+            <option value="occupied">Occupied (Booked)</option>
             <option value="maintenance">Maintenance</option>
             <option value="blocked">Blocked</option>
           </select>
@@ -264,7 +263,7 @@ export function AdminSlotsPage() {
           <div className="p-8 text-center text-xs">
             <AlertCircle className="size-8 mx-auto mb-2 text-destructive" />
             <p className="text-foreground font-semibold">{errorMsg}</p>
-            <Button size="sm" variant="outline" onClick={loadSlots} className="mt-4 text-xs">
+            <Button size="sm" variant="outline" onClick={() => refetch()} className="mt-4 text-xs">
               Try again
             </Button>
           </div>
@@ -283,7 +282,7 @@ export function AdminSlotsPage() {
                     Type
                   </TableHead>
                   <TableHead className="font-mono text-xs uppercase text-muted-foreground">
-                    Admin Status
+                    Status
                   </TableHead>
                   <TableHead className="font-mono text-xs uppercase text-muted-foreground">
                     Tariff
@@ -344,18 +343,46 @@ export function AdminSlotsPage() {
                         </span>
                       </TableCell>
                       <TableCell>
-                        <Badge
-                          variant="outline"
-                          className={`text-[10px] font-mono uppercase px-2 py-0.5 rounded ${
-                            slot.admin_status === "active"
-                              ? "border-emerald-500/40 text-emerald-400 bg-emerald-500/10"
-                              : slot.admin_status === "maintenance"
-                                ? "border-rose-500/40 text-rose-400 bg-rose-500/10"
-                                : "border-amber-500/40 text-amber-400 bg-amber-500/10"
-                          }`}
-                        >
-                          {slot.admin_status === "active" ? "Available" : slot.admin_status}
-                        </Badge>
+                        {slot.admin_status === "maintenance" ? (
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] font-mono uppercase px-2 py-0.5 rounded border-rose-500/40 text-rose-400 bg-rose-500/10"
+                          >
+                            Maintenance
+                          </Badge>
+                        ) : slot.admin_status === "blocked" ? (
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] font-mono uppercase px-2 py-0.5 rounded border-amber-500/40 text-amber-400 bg-amber-500/10"
+                          >
+                            Blocked
+                          </Badge>
+                        ) : slot.is_occupied ? (
+                          <div className="flex flex-col gap-0.5">
+                            <Badge
+                              variant="outline"
+                              className="text-[10px] font-mono uppercase px-2 py-0.5 rounded border-blue-500/40 text-blue-400 bg-blue-500/10 w-fit"
+                            >
+                              Occupied
+                            </Badge>
+                            {slot.current_booking?.plate_snapshot ? (
+                              <span className="font-mono text-[10px] text-muted-foreground">
+                                {slot.current_booking.plate_snapshot}
+                              </span>
+                            ) : slot.current_booking?.reference ? (
+                              <span className="font-mono text-[10px] text-muted-foreground">
+                                #{slot.current_booking.reference.slice(0, 8)}
+                              </span>
+                            ) : null}
+                          </div>
+                        ) : (
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] font-mono uppercase px-2 py-0.5 rounded border-emerald-500/40 text-emerald-400 bg-emerald-500/10"
+                          >
+                            Available
+                          </Badge>
+                        )}
                       </TableCell>
                       <TableCell className="font-mono text-foreground tabular-nums">
                         ₹{Math.round(slot.hourly_rate_paise / 100)}/h

@@ -1,16 +1,15 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
-  Activity,
   CalendarDays,
   CircleGauge,
   IndianRupee,
   CarFront,
   ArrowUpRight,
-  TrendingUp,
   AlertTriangle,
   Zap,
   CheckCircle2,
-  Clock,
+  RefreshCw,
+  Info,
 } from "lucide-react";
 import {
   AreaChart,
@@ -22,15 +21,11 @@ import {
   CartesianGrid,
 } from "recharts";
 import { requireAdminGuard } from "@/lib/auth-guard";
-import { DemoBadge } from "@/components/admin/demo-badge";
-import {
-  ADMIN_DASHBOARD_KPIS,
-  ADMIN_HOURLY_CHART,
-  ADMIN_ALERTS,
-  ADMIN_BOOKINGS,
-} from "@/mocks/admin";
+import { useAdminDashboard } from "@/hooks/useSettings";
+import { formatPaise, formatIstDateTime } from "@/lib/date-utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export const Route = createFileRoute("/admin/")({
   beforeLoad: async ({ location }) => {
@@ -41,7 +36,7 @@ export const Route = createFileRoute("/admin/")({
       { title: "ParkGrid Admin | Dashboard" },
       {
         name: "description",
-        content: "Operational overview, bay occupancy, and hourly revenue.",
+        content: "Operations overview, bay occupancy, and live revenue.",
       },
     ],
   }),
@@ -49,26 +44,36 @@ export const Route = createFileRoute("/admin/")({
 });
 
 function AdminDashboardPage() {
-  const kpis = ADMIN_DASHBOARD_KPIS;
-  const recentBookings = ADMIN_BOOKINGS.slice(0, 6);
+  const { data: dashboard, isLoading, isError, refetch, isFetching } = useAdminDashboard();
+
+  const kpis = dashboard?.kpis;
+  const chartData = dashboard?.revenue_last_7_days ?? [];
+  const recentBookings = dashboard?.recent_bookings ?? [];
+  const alerts = dashboard?.alerts ?? [];
 
   return (
     <div className="space-y-6">
       {/* ── Page Header ── */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-border/60">
         <div>
-          <div className="flex items-center gap-2.5">
-            <h1 className="font-display text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
-              Dashboard
-            </h1>
-            <DemoBadge />
-          </div>
-          <p className="mt-1 text-xs sm:text-sm text-muted-foreground">
-            Operational overview, bay occupancy, and hourly revenue.
-          </p>
+          <h1 className="font-display text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
+            Dashboard
+          </h1>
+          <p className="mt-1 text-xs sm:text-sm text-muted-foreground">Operations overview</p>
         </div>
 
         <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => refetch()}
+            disabled={isFetching}
+            className="gap-1.5 h-8 text-xs font-medium"
+          >
+            <RefreshCw className={`size-3.5 ${isFetching ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+
           <Link to="/admin/map">
             <Button size="sm" variant="outline" className="gap-1.5 h-8 text-xs font-medium">
               View Live Map <ArrowUpRight className="size-3.5" />
@@ -76,6 +81,15 @@ function AdminDashboardPage() {
           </Link>
         </div>
       </div>
+
+      {isError && (
+        <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-xs text-destructive flex items-center justify-between">
+          <span>Failed to load operational statistics from database.</span>
+          <Button size="sm" variant="outline" onClick={() => refetch()} className="h-7 text-xs">
+            Try Again
+          </Button>
+        </div>
+      )}
 
       {/* ── KPI Stat Cards ── */}
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
@@ -89,17 +103,23 @@ function AdminDashboardPage() {
               <CircleGauge className="size-4" />
             </span>
           </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <strong className="font-display text-3xl font-bold text-foreground">
-              {kpis.occupancyPercent}%
-            </strong>
-            <span className="text-xs text-emerald-400 font-mono flex items-center">
-              <TrendingUp className="size-3 mr-0.5 inline" /> +4.2%
-            </span>
-          </div>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {kpis.occupiedSlots} of {kpis.totalSlots} bays active
-          </p>
+          {isLoading ? (
+            <div className="mt-3 space-y-2">
+              <Skeleton className="h-8 w-24" />
+              <Skeleton className="h-3 w-32" />
+            </div>
+          ) : (
+            <>
+              <div className="mt-3 flex items-baseline gap-2">
+                <strong className="font-display text-3xl font-bold text-foreground">
+                  {kpis?.occupancy_percent ?? 0}%
+                </strong>
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {kpis?.occupied_slots ?? 0} of {kpis?.total_active_slots ?? 0} active bays
+              </p>
+            </>
+          )}
         </div>
 
         {/* Active Sessions */}
@@ -112,32 +132,49 @@ function AdminDashboardPage() {
               <CarFront className="size-4" />
             </span>
           </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <strong className="font-display text-3xl font-bold text-foreground">
-              {kpis.activeSessions}
-            </strong>
-            <span className="text-xs text-muted-foreground font-mono">vehicles</span>
-          </div>
-          <p className="mt-1 text-xs text-muted-foreground">Turnover: {kpis.turnoverRate}</p>
+          {isLoading ? (
+            <div className="mt-3 space-y-2">
+              <Skeleton className="h-8 w-20" />
+              <Skeleton className="h-3 w-28" />
+            </div>
+          ) : (
+            <>
+              <div className="mt-3 flex items-baseline gap-2">
+                <strong className="font-display text-3xl font-bold text-foreground">
+                  {kpis?.active_sessions_count ?? 0}
+                </strong>
+                <span className="text-xs text-muted-foreground font-mono">vehicles</span>
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">Currently on-site</p>
+            </>
+          )}
         </div>
 
         {/* Today's Revenue */}
         <div className="rounded-xl border border-border bg-surface p-5 shadow-sm transition-all hover:border-primary/40">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground">
-              Today's Revenue
+              Today's Net Revenue
             </span>
             <span className="flex size-7 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-400">
               <IndianRupee className="size-4" />
             </span>
           </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <strong className="font-display text-3xl font-bold text-foreground">
-              ₹{kpis.todayRevenue.toLocaleString("en-IN")}
-            </strong>
-            <span className="text-xs text-emerald-400 font-mono">+12%</span>
-          </div>
-          <p className="mt-1 text-xs text-muted-foreground">Incl. EV power & valet fees</p>
+          {isLoading ? (
+            <div className="mt-3 space-y-2">
+              <Skeleton className="h-8 w-28" />
+              <Skeleton className="h-3 w-32" />
+            </div>
+          ) : (
+            <>
+              <div className="mt-3 flex items-baseline gap-2">
+                <strong className="font-display text-3xl font-bold text-foreground">
+                  {formatPaise(kpis?.revenue_today_paise ?? 0)}
+                </strong>
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">Succeeded minus refunds (IST)</p>
+            </>
+          )}
         </div>
 
         {/* Bookings Today */}
@@ -150,84 +187,85 @@ function AdminDashboardPage() {
               <CalendarDays className="size-4" />
             </span>
           </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <strong className="font-display text-3xl font-bold text-foreground">
-              {kpis.bookingsToday}
-            </strong>
-            <span className="text-xs text-amber-400 font-mono">slots</span>
-          </div>
-          <p className="mt-1 text-xs text-muted-foreground">6 Fast-EV chargers active</p>
+          {isLoading ? (
+            <div className="mt-3 space-y-2">
+              <Skeleton className="h-8 w-16" />
+              <Skeleton className="h-3 w-28" />
+            </div>
+          ) : (
+            <>
+              <div className="mt-3 flex items-baseline gap-2">
+                <strong className="font-display text-3xl font-bold text-foreground">
+                  {kpis?.bookings_today ?? 0}
+                </strong>
+                <span className="text-xs text-amber-400 font-mono">reservations</span>
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">Created today in IST</p>
+            </>
+          )}
         </div>
       </div>
 
-      {/* ── Telemetry Chart: 24h Occupancy & Revenue Trend ── */}
+      {/* ── 7-Day Revenue Trend Chart ── */}
       <div className="rounded-xl border border-border bg-surface p-6 shadow-sm">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-6">
           <div>
             <h2 className="font-display text-base font-semibold text-foreground">
-              Occupancy and revenue (24h)
+              Daily Net Revenue (Last 7 Days)
             </h2>
             <p className="text-xs text-muted-foreground">
-              Hourly sensor occupancy rate and fee collection
+              Net payment receipts scoped to Indian Standard Time
             </p>
-          </div>
-          <div className="flex items-center gap-4 text-xs font-mono">
-            <span className="flex items-center gap-1.5 text-primary">
-              <span className="size-2.5 rounded-full bg-primary" /> Occupancy %
-            </span>
-            <span className="flex items-center gap-1.5 text-cyan-400">
-              <span className="size-2.5 rounded-full bg-cyan-400" /> Revenue (₹/h)
-            </span>
           </div>
         </div>
 
         <div className="h-72 w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart
-              data={ADMIN_HOURLY_CHART}
-              margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
-            >
-              <defs>
-                <linearGradient id="occupancyGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.35} />
-                  <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
-                </linearGradient>
-                <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#22d3ee" stopOpacity={0.25} />
-                  <stop offset="95%" stopColor="#22d3ee" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-              <XAxis dataKey="time" stroke="#71717a" fontSize={11} tickLine={false} />
-              <YAxis stroke="#71717a" fontSize={11} tickLine={false} />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "#09090b",
-                  borderColor: "rgba(255,255,255,0.12)",
-                  borderRadius: "8px",
-                  fontSize: "12px",
-                }}
-              />
-              <Area
-                type="monotone"
-                dataKey="occupancy"
-                name="Occupancy (%)"
-                stroke="var(--primary)"
-                strokeWidth={2}
-                fillOpacity={1}
-                fill="url(#occupancyGradient)"
-              />
-              <Area
-                type="monotone"
-                dataKey="revenue"
-                name="Revenue (₹)"
-                stroke="#22d3ee"
-                strokeWidth={2}
-                fillOpacity={1}
-                fill="url(#revenueGradient)"
-              />
-            </AreaChart>
-          </ResponsiveContainer>
+          {isLoading ? (
+            <div className="h-full w-full flex items-center justify-center">
+              <Skeleton className="h-60 w-full" />
+            </div>
+          ) : chartData.length === 0 ? (
+            <div className="h-full flex items-center justify-center text-xs text-muted-foreground">
+              No revenue recorded in the last 7 days
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="revenue7dGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.35} />
+                    <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                <XAxis dataKey="label" stroke="#71717a" fontSize={11} tickLine={false} />
+                <YAxis
+                  stroke="#71717a"
+                  fontSize={11}
+                  tickLine={false}
+                  tickFormatter={(val) => `₹${Math.round(val / 100)}`}
+                />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "#09090b",
+                    borderColor: "rgba(255,255,255,0.12)",
+                    borderRadius: "8px",
+                    fontSize: "12px",
+                  }}
+                  formatter={(val: number) => [formatPaise(val), "Net Revenue"]}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="net_paise"
+                  name="Net Revenue"
+                  stroke="#10b981"
+                  strokeWidth={2}
+                  fillOpacity={1}
+                  fill="url(#revenue7dGradient)"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          )}
         </div>
       </div>
 
@@ -240,7 +278,7 @@ function AdminDashboardPage() {
               <h2 className="font-display text-base font-semibold text-foreground">
                 Recent Bookings
               </h2>
-              <p className="text-xs text-muted-foreground">Incoming & active reservations</p>
+              <p className="text-xs text-muted-foreground">Latest reservation activity</p>
             </div>
             <Link to="/admin/bookings" className="text-xs text-primary hover:underline">
               View all →
@@ -248,96 +286,121 @@ function AdminDashboardPage() {
           </div>
 
           <div className="divide-y divide-border/60">
-            {recentBookings.map((b) => (
-              <div key={b.id} className="py-3 flex items-center justify-between text-xs">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <strong className="text-foreground font-medium">{b.guestName}</strong>
-                    <span className="font-mono text-[10px] text-muted-foreground">
-                      ({b.vehiclePlate})
-                    </span>
+            {isLoading ? (
+              Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="py-3 flex items-center justify-between">
+                  <div className="space-y-1">
+                    <Skeleton className="h-4 w-28" />
+                    <Skeleton className="h-3 w-40" />
                   </div>
-                  <div className="mt-0.5 text-muted-foreground flex items-center gap-2">
-                    <span className="font-mono font-semibold text-foreground">
-                      Bay {b.slotCode}
-                    </span>
-                    <span>•</span>
-                    <span>Level {b.level}</span>
-                  </div>
+                  <Skeleton className="h-6 w-16" />
                 </div>
-                <div className="text-right">
-                  <span className="font-mono font-semibold text-foreground">₹{b.amount}</span>
-                  <div className="mt-0.5">
-                    <Badge
-                      variant="outline"
-                      className={`text-[9px] font-mono py-0 px-1.5 ${
-                        b.status === "active"
-                          ? "border-emerald-500/40 text-emerald-400 bg-emerald-500/10"
-                          : b.status === "confirmed"
-                            ? "border-cyan-500/40 text-cyan-400 bg-cyan-500/10"
-                            : "border-border text-muted-foreground"
-                      }`}
-                    >
-                      {b.status}
-                    </Badge>
-                  </div>
-                </div>
+              ))
+            ) : recentBookings.length === 0 ? (
+              <div className="py-8 text-center text-xs text-muted-foreground">
+                No recent bookings recorded.
               </div>
-            ))}
+            ) : (
+              recentBookings.map((b) => (
+                <div key={b.id} className="py-3 flex items-center justify-between text-xs">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono font-medium text-foreground">{b.reference}</span>
+                      <span className="font-mono text-[10px] text-muted-foreground">
+                        ({b.plate_snapshot || "No Plate"})
+                      </span>
+                    </div>
+                    <div className="mt-0.5 text-muted-foreground flex items-center gap-2 text-[11px]">
+                      <span className="font-semibold text-foreground">Bay {b.slot_code}</span>
+                      <span>•</span>
+                      <span>{formatIstDateTime(b.start_at)}</span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="font-mono font-semibold text-foreground">
+                      {formatPaise(b.total_paise)}
+                    </span>
+                    <div className="mt-0.5">
+                      <Badge
+                        variant="outline"
+                        className={`text-[9px] font-mono py-0 px-1.5 ${
+                          b.status === "active"
+                            ? "border-emerald-500/40 text-emerald-400 bg-emerald-500/10"
+                            : b.status === "confirmed"
+                              ? "border-cyan-500/40 text-cyan-400 bg-cyan-500/10"
+                              : b.status === "cancelled"
+                                ? "border-destructive/40 text-destructive bg-destructive/10"
+                                : "border-border text-muted-foreground"
+                        }`}
+                      >
+                        {b.status}
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
 
-        {/* System & Hardware Alerts */}
+        {/* Operational Alerts */}
         <div className="rounded-xl border border-border bg-surface p-6 shadow-sm">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h2 className="font-display text-base font-semibold text-foreground">
-                Hardware & Ops Alerts
+                Operational Alerts
               </h2>
-              <p className="text-xs text-muted-foreground">
-                Barrier gates, ultrasonic sensors, EV hubs
-              </p>
+              <p className="text-xs text-muted-foreground">Live facility exceptions and issues</p>
             </div>
-            <span className="size-2 rounded-full bg-emerald-500 inline-block animate-pulse" />
+            <span
+              className={`size-2 rounded-full inline-block ${
+                alerts.length > 0 ? "bg-amber-500 animate-pulse" : "bg-emerald-500"
+              }`}
+            />
           </div>
 
           <div className="space-y-3">
-            {ADMIN_ALERTS.map((alert) => {
-              const isWarning = alert.severity === "warning";
-              const isCritical = alert.severity === "critical";
-              return (
-                <div
-                  key={alert.id}
-                  className={`rounded-lg border p-3.5 text-xs ${
-                    isCritical
-                      ? "border-destructive/30 bg-destructive/10 text-destructive-foreground"
-                      : isWarning
-                        ? "border-amber-500/30 bg-amber-500/10 text-amber-200"
-                        : "border-border bg-background/50 text-foreground"
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-semibold flex items-center gap-1.5">
-                      {isCritical ? (
-                        <AlertTriangle className="size-3.5 text-destructive" />
-                      ) : isWarning ? (
-                        <Zap className="size-3.5 text-amber-400" />
-                      ) : (
-                        <CheckCircle2 className="size-3.5 text-primary" />
-                      )}
-                      {alert.title}
-                    </span>
-                    <span className="font-mono text-[10px] text-muted-foreground">
-                      {alert.timestamp}
-                    </span>
+            {isLoading ? (
+              Array.from({ length: 3 }).map((_, i) => (
+                <Skeleton key={i} className="h-16 w-full rounded-lg" />
+              ))
+            ) : alerts.length === 0 ? (
+              <div className="py-8 text-center text-xs text-muted-foreground flex flex-col items-center justify-center gap-2">
+                <CheckCircle2 className="size-6 text-emerald-400" />
+                <span>All systems normal. No operational alerts.</span>
+              </div>
+            ) : (
+              alerts.map((alert) => {
+                const isErrorAlert = alert.severity === "error";
+                const isWarning = alert.severity === "warning";
+                return (
+                  <div
+                    key={alert.id}
+                    className={`rounded-lg border p-3.5 text-xs ${
+                      isErrorAlert
+                        ? "border-destructive/30 bg-destructive/10 text-destructive-foreground"
+                        : isWarning
+                          ? "border-amber-500/30 bg-amber-500/10 text-amber-200"
+                          : "border-border bg-background/50 text-foreground"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold flex items-center gap-1.5">
+                        {isErrorAlert ? (
+                          <AlertTriangle className="size-3.5 text-destructive" />
+                        ) : isWarning ? (
+                          <Zap className="size-3.5 text-amber-400" />
+                        ) : (
+                          <Info className="size-3.5 text-primary" />
+                        )}
+                        {alert.title}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-[11px] text-muted-foreground">{alert.description}</p>
                   </div>
-                  <p className="mt-1 text-[11px] text-muted-foreground">{alert.description}</p>
-                  <span className="mt-1.5 block font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
-                    Source: {alert.source}
-                  </span>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
         </div>
       </div>

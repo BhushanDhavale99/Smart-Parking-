@@ -5,15 +5,20 @@ import {
   listMyPayments,
   adminListPayments,
   adminGetPayment,
+  adminRefundPayment,
+  adminRevenueReport,
   type PaymentRow,
   type PaymentRefundRow,
+  type RevenueReportData,
 } from "@/lib/payments.server";
 import type { PaymentMethod, TestScenario } from "@/lib/payments/provider";
+import { invalidateBookingRelatedQueries, AVAILABILITY_QUERY_KEY } from "./useBookings";
 
 export const PAYMENTS_QUERY_KEY = ["payments"] as const;
 export const ADMIN_PAYMENTS_QUERY_KEY = ["admin", "payments"] as const;
+export const REVENUE_QUERY_KEY = ["admin", "revenue"] as const;
 export const BOOKINGS_QUERY_KEY = ["bookings"] as const;
-export const AVAILABILITY_QUERY_KEY = ["slot_availability"] as const;
+export { AVAILABILITY_QUERY_KEY };
 
 export type { PaymentRow, PaymentRefundRow };
 
@@ -38,9 +43,7 @@ export function usePayBooking() {
       return res;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: AVAILABILITY_QUERY_KEY });
-      queryClient.invalidateQueries({ queryKey: BOOKINGS_QUERY_KEY });
-      queryClient.invalidateQueries({ queryKey: PAYMENTS_QUERY_KEY });
+      invalidateBookingRelatedQueries(queryClient);
     },
   });
 }
@@ -131,5 +134,41 @@ export function useAdminGetPayment(paymentId?: string | undefined) {
       return res.payment;
     },
     enabled: Boolean(paymentId),
+  });
+}
+
+export function useAdminRefundPayment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: { payment_id: string; amount_paise: number; reason: string }) => {
+      const res = await adminRefundPayment({ data: params });
+      return res.refund;
+    },
+    onSuccess: () => {
+      invalidateBookingRelatedQueries(queryClient);
+      queryClient.invalidateQueries({ queryKey: REVENUE_QUERY_KEY });
+    },
+  });
+}
+
+export function useAdminRevenueReport(params: {
+  from: string;
+  to: string;
+  group?: "day" | "week" | "month";
+}) {
+  return useQuery({
+    queryKey: [...REVENUE_QUERY_KEY, params],
+    queryFn: async () => {
+      const res = await adminRevenueReport({
+        data: {
+          from: params.from,
+          to: params.to,
+          group: params.group ?? "day",
+        },
+      });
+      return res.report;
+    },
+    enabled: Boolean(params.from && params.to),
+    staleTime: 1000 * 30,
   });
 }

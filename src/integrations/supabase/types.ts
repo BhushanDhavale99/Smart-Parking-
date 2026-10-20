@@ -8,6 +8,35 @@ export type Database = {
   };
   public: {
     Tables: {
+      availability_ping: {
+        Row: {
+          id: number;
+          ping_count: number;
+          slot_id: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          id?: number;
+          ping_count?: number;
+          slot_id?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          id?: number;
+          ping_count?: number;
+          slot_id?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "availability_ping_slot_id_fkey";
+            columns: ["slot_id"];
+            isOneToOne: false;
+            referencedRelation: "parking_slots";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
       profiles: {
         Row: {
           id: string;
@@ -602,6 +631,42 @@ export type Database = {
           },
         ];
       };
+      admin_audit_log: {
+        Row: {
+          id: string;
+          actor_id: string;
+          action: string;
+          record_type: "booking" | "user" | "payment" | "settings";
+          record_id: string;
+          reason: string;
+          old_data: Json | null;
+          new_data: Json | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          actor_id: string;
+          action: string;
+          record_type: "booking" | "user" | "payment" | "settings";
+          record_id: string;
+          reason: string;
+          old_data?: Json | null;
+          new_data?: Json | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          actor_id?: string;
+          action?: string;
+          record_type?: "booking" | "user" | "payment" | "settings";
+          record_id?: string;
+          reason?: string;
+          old_data?: Json | null;
+          new_data?: Json | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       [_ in never]: never;
@@ -675,6 +740,10 @@ export type Database = {
           p_reason?: string | null;
         };
         Returns: Database["public"]["Tables"]["bookings"]["Row"];
+      };
+      expire_unused_bookings: {
+        Args: Record<string, never>;
+        Returns: number;
       };
       generate_receipt_number: {
         Args: Record<string, never>;
@@ -795,6 +864,114 @@ export type Database = {
           overstay_total_paise: number;
           total_count: number;
         }[];
+      };
+      admin_list_users: {
+        Args: {
+          p_search?: string | null;
+          p_role?: string | null;
+          p_limit?: number;
+          p_offset?: number;
+        };
+        Returns: {
+          id: string;
+          email: string;
+          full_name: string | null;
+          phone: string | null;
+          role: string;
+          created_at: string;
+          last_sign_in_at: string | null;
+          booking_count: number;
+          total_paid_paise: number;
+          total_count: number;
+        }[];
+      };
+      admin_set_user_role: {
+        Args: {
+          p_user_id: string;
+          p_role: string;
+          p_reason: string;
+        };
+        Returns: Database["public"]["Tables"]["profiles"]["Row"];
+      };
+      admin_override_booking: {
+        Args: {
+          p_booking_id: string;
+          p_action: string;
+          p_reason: string;
+        };
+        Returns: Database["public"]["Tables"]["bookings"]["Row"];
+      };
+      admin_refund_payment: {
+        Args: {
+          p_payment_id: string;
+          p_amount_paise: number;
+          p_reason: string;
+        };
+        Returns: Database["public"]["Tables"]["payment_refunds"]["Row"];
+      };
+      admin_revenue_report: {
+        Args: {
+          p_from: string;
+          p_to: string;
+          p_group?: string;
+        };
+        Returns: Json;
+      };
+      admin_active_sessions: {
+        Args: Record<string, never>;
+        Returns: {
+          session_id: string;
+          booking_id: string;
+          booking_reference: string;
+          slot_code: string;
+          level_code: string;
+          plate_snapshot: string;
+          user_full_name: string | null;
+          started_at: string;
+          booked_end_at: string;
+          overstay_minutes: number;
+          overstay_charge_paise: number;
+          is_overstay: boolean;
+        }[];
+      };
+      admin_update_settings: {
+        Args: {
+          p_gst_bps: number;
+          p_hold_minutes: number;
+          p_min_hours: number;
+          p_max_hours: number;
+          p_max_advance_days: number;
+          p_refund_full_hours: number;
+          p_refund_partial_minutes: number;
+          p_partial_refund_bps: number;
+          p_exit_grace_minutes: number;
+          p_reason: string;
+        };
+        Returns: Database["public"]["Tables"]["pricing_settings"]["Row"];
+      };
+      admin_dashboard_stats: {
+        Args: Record<string, never>;
+        Returns: Json;
+      };
+      admin_get_slot_rates: {
+        Args: Record<string, never>;
+        Returns: Json;
+      };
+      admin_update_slot_rates: {
+        Args: {
+          p_standard_rate_paise: number;
+          p_ev_rate_paise: number;
+          p_accessible_rate_paise: number;
+          p_reason: string;
+        };
+        Returns: Json;
+      };
+      admin_payment_totals: {
+        Args: {
+          p_date_from?: string | null;
+          p_date_to?: string | null;
+        };
+        Returns: Json;
       };
     };
     Enums: {

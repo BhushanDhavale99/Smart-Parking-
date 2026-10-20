@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import {
   getAvailability,
   quoteBooking,
@@ -8,11 +8,17 @@ import {
   getCancellationPreview,
   cancelBooking,
   adminListBookings,
+  adminGetBooking,
+  adminOverrideBooking,
   type BookingRow,
 } from "@/lib/bookings.server";
+import { listSlots, type ListSlotsInput, type ParkingSlotWithOccupancy } from "@/lib/parking.server";
+import { SESSIONS_QUERY_KEY } from "./useSessions";
+import { PAYMENTS_QUERY_KEY } from "./usePayments";
 
 export type { BookingRow };
 export type BookingStatus = BookingRow["status"];
+export type { ParkingSlotWithOccupancy };
 
 export type AdminBookingRow = BookingRow & {
   parking_slots?: {
@@ -51,6 +57,38 @@ export type MyBookingRow = BookingRow & {
 
 export const BOOKINGS_QUERY_KEY = ["bookings"] as const;
 export const AVAILABILITY_QUERY_KEY = ["availability"] as const;
+export const SLOTS_QUERY_KEY = ["slots"] as const;
+
+/**
+ * Invalidate all interdependent parking, slot, booking, session, and administrative queries.
+ * Called whenever a booking is created, confirmed, paid, cancelled, or overridden.
+ */
+export function invalidateBookingRelatedQueries(queryClient: QueryClient) {
+  queryClient.invalidateQueries({ queryKey: AVAILABILITY_QUERY_KEY });
+  queryClient.invalidateQueries({ queryKey: SLOTS_QUERY_KEY });
+  queryClient.invalidateQueries({ queryKey: BOOKINGS_QUERY_KEY });
+  queryClient.invalidateQueries({ queryKey: SESSIONS_QUERY_KEY });
+  queryClient.invalidateQueries({ queryKey: PAYMENTS_QUERY_KEY });
+  queryClient.invalidateQueries({ queryKey: ["admin"] });
+}
+
+export function useParkingSlots(params: Partial<ListSlotsInput> = {}) {
+  return useQuery({
+    queryKey: [...SLOTS_QUERY_KEY, params],
+    queryFn: async () => {
+      const res = await listSlots({ data: params });
+      return res as {
+        slots: ParkingSlotWithOccupancy[];
+        totalCount: number;
+        page: number;
+        pageSize: number;
+        totalPages: number;
+      };
+    },
+    staleTime: 1000 * 10,
+    refetchInterval: 1000 * 60, // 60s fallback polling (realtime push is primary)
+  });
+}
 
 export function useAvailability(
   params: {
@@ -69,8 +107,8 @@ export function useAvailability(
       return res.availability;
     },
     enabled: Boolean(enabled && params.start_at && params.end_at),
-    staleTime: 1000 * 15, // 15 seconds
-    refetchInterval: 1000 * 30, // 30 seconds polling for live updates
+    staleTime: 1000 * 10,
+    refetchInterval: 1000 * 60, // 60s fallback polling
   });
 }
 
@@ -113,8 +151,7 @@ export function useCreateBooking() {
       return res.booking;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: AVAILABILITY_QUERY_KEY });
-      queryClient.invalidateQueries({ queryKey: BOOKINGS_QUERY_KEY });
+      invalidateBookingRelatedQueries(queryClient);
     },
   });
 }
@@ -135,7 +172,8 @@ export function useListMyBookings(
         pageSize: number;
       };
     },
-    staleTime: 1000 * 20,
+    staleTime: 1000 * 10,
+    refetchInterval: 1000 * 60, // 60s fallback polling
   });
 }
 
@@ -176,8 +214,7 @@ export function useCancelBooking() {
       return res.booking;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: AVAILABILITY_QUERY_KEY });
-      queryClient.invalidateQueries({ queryKey: BOOKINGS_QUERY_KEY });
+      invalidateBookingRelatedQueries(queryClient);
     },
   });
 }
@@ -186,6 +223,8 @@ export function useAdminBookings(params?: {
   status?: string | undefined;
   payment_status?: string | undefined;
   search?: string | undefined;
+  dateFrom?: string | undefined;
+  dateTo?: string | undefined;
   page?: number | undefined;
   pageSize?: number | undefined;
 }) {
@@ -193,8 +232,10 @@ export function useAdminBookings(params?: {
     status: params?.status ?? "All",
     payment_status: params?.payment_status ?? "All",
     search: params?.search ?? "",
+    dateFrom: params?.dateFrom,
+    dateTo: params?.dateTo,
     page: params?.page ?? 1,
-    pageSize: params?.pageSize ?? 10,
+    pageSize: Math.min(params?.pageSize ?? 10, 50),
   };
   return useQuery({
     queryKey: [...BOOKINGS_QUERY_KEY, "admin", normalizedParams],
@@ -208,6 +249,36 @@ export function useAdminBookings(params?: {
         pageSize: number;
       };
     },
-    staleTime: 1000 * 15,
+    staleTime: 1000 * 10,
+    refetchInterval: 1000 * 60, // 60s fallback sync for admin bookings
+  });
+}
+
+export function useAdminBookingDetail(bookingId: string | null | undefined) {
+  return useQuery({
+    queryKey: [...BOOKINGS_QUERY_KEY, "admin_detail", bookingId],
+    queryFn: async () => {
+      if (!bookingId) return null;
+      const res = await adminGetBooking({ data: { booking_id: bookingId } });
+      return res.booking;
+    },
+    enabled: Boolean(bookingId),
+  });
+}
+
+export function useAdminOverrideBooking() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: {
+      booking_id: string;
+      action: "cancel_full_refund" | "cancel_by_policy" | "cancel_no_refund" | "mark_no_show";
+      reason: string;
+    }) => {
+      const res = await adminOverrideBooking({ data: params });
+      return res.booking;
+    },
+    onSuccess: () => {
+      invalidateBookingRelatedQueries(queryClient);
+    },
   });
 }

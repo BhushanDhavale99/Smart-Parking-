@@ -34,6 +34,7 @@ import { Route as AdminKnowledgeRouteImport } from './routes/admin.knowledge'
 import { Route as AdminMapRouteImport } from './routes/admin.map'
 import { Route as AdminPaymentsRouteImport } from './routes/admin.payments'
 import { Route as AdminPricingRouteImport } from './routes/admin.pricing'
+import { Route as AdminRevenueRouteImport } from './routes/admin.revenue'
 import { Route as AdminSessionsRouteImport } from './routes/admin.sessions'
 import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
 import { Route as AdminSlotsRouteImport } from './routes/admin.slots'
@@ -166,6 +167,11 @@ const AdminPricingRoute = AdminPricingRouteImport.update({
   path: '/pricing',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminRevenueRoute = AdminRevenueRouteImport.update({
+  id: '/revenue',
+  path: '/revenue',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminSessionsRoute = AdminSessionsRouteImport.update({
   id: '/sessions',
   path: '/sessions',
@@ -222,6 +228,7 @@ export interface FileRoutesByFullPath {
   '/admin/map': typeof AdminMapRoute
   '/admin/payments': typeof AdminPaymentsRoute
   '/admin/pricing': typeof AdminPricingRoute
+  '/admin/revenue': typeof AdminRevenueRoute
   '/admin/sessions': typeof AdminSessionsRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/slots': typeof AdminSlotsRoute
@@ -254,6 +261,7 @@ export interface FileRoutesByTo {
   '/admin/map': typeof AdminMapRoute
   '/admin/payments': typeof AdminPaymentsRoute
   '/admin/pricing': typeof AdminPricingRoute
+  '/admin/revenue': typeof AdminRevenueRoute
   '/admin/sessions': typeof AdminSessionsRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/slots': typeof AdminSlotsRoute
@@ -288,6 +296,7 @@ export interface FileRoutesById {
   '/admin/map': typeof AdminMapRoute
   '/admin/payments': typeof AdminPaymentsRoute
   '/admin/pricing': typeof AdminPricingRoute
+  '/admin/revenue': typeof AdminRevenueRoute
   '/admin/sessions': typeof AdminSessionsRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/slots': typeof AdminSlotsRoute
@@ -323,6 +332,7 @@ export interface FileRouteTypes {
     | '/admin/map'
     | '/admin/payments'
     | '/admin/pricing'
+    | '/admin/revenue'
     | '/admin/sessions'
     | '/admin/settings'
     | '/admin/slots'
@@ -355,6 +365,7 @@ export interface FileRouteTypes {
     | '/admin/map'
     | '/admin/payments'
     | '/admin/pricing'
+    | '/admin/revenue'
     | '/admin/sessions'
     | '/admin/settings'
     | '/admin/slots'
@@ -388,6 +399,7 @@ export interface FileRouteTypes {
     | '/admin/map'
     | '/admin/payments'
     | '/admin/pricing'
+    | '/admin/revenue'
     | '/admin/sessions'
     | '/admin/settings'
     | '/admin/slots'
@@ -598,6 +610,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminPricingRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/revenue': {
+      id: '/admin/revenue'
+      path: '/revenue'
+      fullPath: '/admin/revenue'
+      preLoaderRoute: typeof AdminRevenueRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/sessions': {
       id: '/admin/sessions'
       path: '/sessions'
@@ -649,6 +668,7 @@ interface AdminRouteChildren {
   AdminMapRoute: typeof AdminMapRoute
   AdminPaymentsRoute: typeof AdminPaymentsRoute
   AdminPricingRoute: typeof AdminPricingRoute
+  AdminRevenueRoute: typeof AdminRevenueRoute
   AdminSessionsRoute: typeof AdminSessionsRoute
   AdminSettingsRoute: typeof AdminSettingsRoute
   AdminSlotsRoute: typeof AdminSlotsRoute
@@ -662,6 +682,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminMapRoute: AdminMapRoute,
   AdminPaymentsRoute: AdminPaymentsRoute,
   AdminPricingRoute: AdminPricingRoute,
+  AdminRevenueRoute: AdminRevenueRoute,
   AdminSessionsRoute: AdminSessionsRoute,
   AdminSettingsRoute: AdminSettingsRoute,
   AdminSlotsRoute: AdminSlotsRoute,

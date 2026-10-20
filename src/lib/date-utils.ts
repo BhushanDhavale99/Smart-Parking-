@@ -72,3 +72,30 @@ export function formatPaise(paise: number): string {
   const rupees = paise / 100;
   return `₹${rupees % 1 === 0 ? rupees.toFixed(0) : rupees.toFixed(2)}`;
 }
+
+/**
+ * Validates that an incoming timestamp string is an ISO-8601 string
+ * and normalizes it to UTC format (ending in 'Z').
+ * Logs a warning if a string without explicit offset is provided.
+ */
+export function ensureUtcIsoString(timestamp: string, paramName: string = "timestamp"): string {
+  if (!timestamp || typeof timestamp !== "string") {
+    throw new Error(`Invalid ${paramName}: timestamp string required.`);
+  }
+
+  const d = new Date(timestamp);
+  if (isNaN(d.getTime())) {
+    throw new Error(`Invalid ${paramName}: unable to parse date/time string "${timestamp}".`);
+  }
+
+  // Detect strings that lack timezone offset (e.g., "2026-10-20T17:00:00")
+  const hasTimezoneDesignator = /Z|[+-]\d{2}(?::?\d{2})?$/i.test(timestamp.trim());
+  if (!hasTimezoneDesignator) {
+    console.warn(
+      `[Timezone Warning] ${paramName} ("${timestamp}") lacks explicit UTC/offset designator. Normalizing to UTC ISO.`,
+    );
+  }
+
+  return d.toISOString();
+}
+

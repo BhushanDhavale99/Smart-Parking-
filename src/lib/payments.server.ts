@@ -189,7 +189,7 @@ export const getReceipt = createServerFn({ method: "GET" })
     }
 
     if (!payment) {
-      throw new Response("Receipt not found", { status: 404 });
+      throw new Error("Receipt not found.");
     }
 
     return { payment };
@@ -331,51 +331,36 @@ export const adminListPayments = createServerFn({ method: "GET" })
       throw new Error("Failed to load payment transactions.");
     }
 
-    // Compute financial totals across all transactions
-    const { data: allTotals, error: totalsError } = await client
-      .from("payments")
-      .select("amount_paise, status, payment_refunds (amount_paise)");
+    // Compute financial totals across matching date range via DB aggregation RPC
+    const { data: totalsData, error: totalsError } = await client.rpc("admin_payment_totals", {
+      p_date_from: data.dateFrom || null,
+      p_date_to: data.dateTo || null,
+    });
 
-    let grossPaise = 0;
-    let totalRefundPaise = 0;
-    let succeededCount = 0;
-    let failedCount = 0;
+    let totals = {
+      grossPaise: 0,
+      refundPaise: 0,
+      netPaise: 0,
+      succeededCount: 0,
+      failedCount: 0,
+      totalTransactions: count ?? 0,
+    };
 
-    if (!totalsError && allTotals) {
-      for (const p of allTotals) {
-        if (
-          p.status === "succeeded" ||
-          p.status === "refunded" ||
-          p.status === "partially_refunded"
-        ) {
-          grossPaise += p.amount_paise;
-          succeededCount += 1;
-        } else if (p.status === "failed") {
-          failedCount += 1;
-        }
-
-        const refunds = (p.payment_refunds as Array<{ amount_paise: number }>) || [];
-        for (const r of refunds) {
-          totalRefundPaise += r.amount_paise;
-        }
-      }
+    if (!totalsError && totalsData && typeof totalsData === "object") {
+      totals = totalsData as typeof totals;
+    } else if (totalsError) {
+      console.warn(
+        "[adminListPayments] admin_payment_totals RPC error:",
+        totalsError.message,
+      );
     }
-
-    const netPaise = grossPaise - totalRefundPaise;
 
     return {
       payments: payments ?? [],
       totalCount: count ?? 0,
       page: data.page,
       pageSize: data.pageSize,
-      totals: {
-        grossPaise,
-        refundPaise: totalRefundPaise,
-        netPaise,
-        succeededCount,
-        failedCount,
-        totalTransactions: allTotals?.length ?? count ?? 0,
-      },
+      totals,
     };
   });
 
@@ -414,8 +399,129 @@ export const adminGetPayment = createServerFn({ method: "GET" })
 
     if (error || !payment) {
       console.error("[adminGetPayment] Lookup error:", error?.message);
-      throw new Response("Payment not found", { status: 404 });
+      throw new Error("Payment not found.");
     }
 
     return { payment };
+  });
+
+// ── 6. adminRefundPayment ─────────────────────────────────────
+const adminRefundPaymentSchema = z.object({
+  payment_id: z.string().uuid(),
+  amount_paise: z.number().int().min(1, "Refund amount must be at least 1 paise"),
+  reason: z
+    .string()
+    .trim()
+    .min(5, "Reason must be at least 5 characters")
+    .max(300, "Reason cannot exceed 300 characters"),
+});
+
+export const adminRefundPayment = createServerFn({ method: "POST" })
+  .validator((params: unknown) => safeValidate(adminRefundPaymentSchema, params))
+  .handler(async ({ data }) => {
+    const { getRequest } = await import("@tanstack/react-start/server");
+    const request = getRequest();
+    if (!request) throw new Response("Request context missing", { status: 400 });
+
+    const { requireAdmin } = await import("@/lib/auth.server");
+    await requireAdmin(request);
+
+    const client = await getScopedClient(request);
+
+    const { data: refund, error } = await client.rpc("admin_refund_payment", {
+      p_payment_id: data.payment_id,
+      p_amount_paise: data.amount_paise,
+      p_reason: data.reason,
+    });
+
+    if (error) {
+      console.error("[adminRefundPayment] RPC error:", error.message);
+      throw new Error(error.message || "Failed to process administrative refund.");
+    }
+
+    return { refund };
+  });
+
+// ── 7. adminRevenueReport ─────────────────────────────────────
+const adminRevenueReportSchema = z.object({
+  from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid start date format (YYYY-MM-DD)"),
+  to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid end date format (YYYY-MM-DD)"),
+  group: z.enum(["day", "week", "month"]).default("day"),
+});
+
+export type RevenueReportPeriod = {
+  period_label: string;
+  gross_paise: number;
+  refund_paise: number;
+  net_paise: number;
+  gst_paise: number;
+  bookings_count: number;
+  cancelled_count: number;
+  overstay_paise: number;
+};
+
+export type RevenueReportTotals = {
+  total_gross_paise: number;
+  total_refund_paise: number;
+  total_net_paise: number;
+  total_gst_paise: number;
+  total_bookings: number;
+  total_cancelled: number;
+  total_overstay_paise: number;
+  average_booking_value_paise: number;
+  cancellation_rate_bps: number;
+};
+
+export type RevenueReportBreakdown = {
+  slot_type?: string;
+  level_code?: string;
+  method?: string;
+  bookings_count?: number;
+  count?: number;
+  gross_paise: number;
+};
+
+export type RevenueReportData = {
+  periods: RevenueReportPeriod[];
+  totals: RevenueReportTotals;
+  breakdown_by_slot_type: RevenueReportBreakdown[];
+  breakdown_by_level: RevenueReportBreakdown[];
+  breakdown_by_payment_method: RevenueReportBreakdown[];
+};
+
+export const adminRevenueReport = createServerFn({ method: "GET" })
+  .validator((params: unknown) => safeValidate(adminRevenueReportSchema, params))
+  .handler(async ({ data }) => {
+    const { getRequest } = await import("@tanstack/react-start/server");
+    const request = getRequest();
+    if (!request) throw new Response("Request context missing", { status: 400 });
+
+    const { requireAdmin } = await import("@/lib/auth.server");
+    await requireAdmin(request);
+
+    // Validate max 366 days
+    const fromDate = new Date(data.from);
+    const toDate = new Date(data.to);
+    const diffDays = Math.ceil((toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24));
+    if (diffDays < 0) {
+      throw new Error("Start date must be before or equal to end date.");
+    }
+    if (diffDays > 366) {
+      throw new Error("Date range cannot exceed 366 days.");
+    }
+
+    const client = await getScopedClient(request);
+
+    const { data: rawReport, error } = await client.rpc("admin_revenue_report", {
+      p_from: data.from,
+      p_to: data.to,
+      p_group: data.group,
+    });
+
+    if (error) {
+      console.error("[adminRevenueReport] RPC error:", error.message);
+      throw new Error(error.message || "Failed to generate revenue report.");
+    }
+
+    return { report: rawReport as unknown as RevenueReportData };
   });
