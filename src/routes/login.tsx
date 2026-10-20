@@ -27,6 +27,16 @@ export const Route = createFileRoute("/login")({
         data: { session },
       } = await supabase.auth.getSession();
       if (session) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", session.user.id)
+          .maybeSingle();
+
+        if (profile?.role === "admin") {
+          throw redirect({ to: "/admin", replace: true });
+        }
+
         const target =
           search.redirect &&
           search.redirect.startsWith("/") &&
@@ -78,14 +88,7 @@ function RouteLoginComponent() {
     sessionStorage.removeItem("parkgrid_seen_intro");
     replayParkingIntro();
 
-    // Rule 1: explicit, validated redirect param — honour it for everyone.
-    if (explicitRedirect) {
-      navigate({ to: explicitRedirect });
-      return;
-    }
-
-    // Rules 2 & 3: no redirect param — look up role server-side to pick destination.
-    // Uses the signed-in user's own token so RLS applies.
+    // Check if user is an admin; if so, send directly to /admin
     try {
       const { supabase } = await import("@/integrations/supabase/client");
       const {
@@ -100,12 +103,20 @@ function RouteLoginComponent() {
           .maybeSingle();
 
         if (!error && profile?.role === "admin") {
-          navigate({ to: "/admin" });
+          const adminTarget =
+            explicitRedirect && explicitRedirect.startsWith("/admin") ? explicitRedirect : "/admin";
+          navigate({ to: adminTarget });
           return;
         }
       }
     } catch {
-      // Rule 3: any failure → treat as member and fall through to default.
+      // Fall through to member redirect
+    }
+
+    // Explicit, validated redirect param for members.
+    if (explicitRedirect) {
+      navigate({ to: explicitRedirect });
+      return;
     }
 
     // Member default destination.

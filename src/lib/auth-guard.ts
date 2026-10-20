@@ -42,6 +42,20 @@ export async function requireAuthGuard(location: { pathname: string }) {
           : { to: "/login", search: { redirect: redirectTo }, replace: true },
       );
     }
+
+    // Admin users should only access the admin portal, not member protected routes
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", session.user.id)
+      .maybeSingle();
+
+    if (profile?.role === "admin") {
+      throw redirect({
+        to: "/admin",
+        replace: true,
+      });
+    }
   } catch (err) {
     if (
       err != null &&

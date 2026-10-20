@@ -973,6 +973,20 @@ export type Database = {
         };
         Returns: Json;
       };
+      mark_notifications_read: {
+        Args: {
+          p_ids: string[];
+        };
+        Returns: number;
+      };
+      mark_all_notifications_read: {
+        Args: Record<string, never>;
+        Returns: number;
+      };
+      unread_notification_count: {
+        Args: Record<string, never>;
+        Returns: number;
+      };
     };
     Enums: {
       [_ in never]: never;

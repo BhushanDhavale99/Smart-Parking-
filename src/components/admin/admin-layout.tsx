@@ -13,7 +13,6 @@ import {
   LogOut,
   Menu,
   X,
-  ExternalLink,
   PanelLeftClose,
   PanelLeftOpen,
   AlertTriangle,
@@ -216,18 +215,6 @@ export function AdminLayout({ children }: { children?: React.ReactNode }) {
 
             <div className="h-4 w-px bg-border/80 hidden sm:block" />
 
-            <Link
-              to="/"
-              className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1 transition-colors px-2 py-1 rounded"
-              title="Return to customer site"
-            >
-              <span className="hidden sm:inline">View member site</span>
-              <span className="sm:hidden">Site</span>
-              <ExternalLink className="size-3" />
-            </Link>
-
-            <div className="h-4 w-px bg-border/80 hidden sm:block" />
-
             <Button
               variant="ghost"
               size="sm"
@@ -410,16 +397,6 @@ export function AdminLayout({ children }: { children?: React.ReactNode }) {
                     </div>
                   ))}
                 </div>
-              </div>
-
-              <div className="border-t border-border pt-4 mt-6">
-                <Link
-                  to="/"
-                  className="flex items-center justify-between text-xs text-muted-foreground hover:text-foreground py-2"
-                >
-                  <span>View member site</span>
-                  <ExternalLink className="size-3.5" />
-                </Link>
               </div>
             </div>
           </div>

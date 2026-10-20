@@ -173,10 +173,7 @@ export const adminListAuditLogs = createServerFn({ method: "GET" })
         .in("id", actorIds);
 
       if (profilesError) {
-        console.warn(
-          "[adminListAuditLogs] Actor profiles query error:",
-          profilesError.message,
-        );
+        console.warn("[adminListAuditLogs] Actor profiles query error:", profilesError.message);
       }
       (profiles ?? []).forEach((p) => profileMap.set(p.id, p));
     }
@@ -300,9 +297,8 @@ export const adminGetDashboardStats = createServerFn({ method: "GET" }).handler(
 
   if (error || !data) {
     console.error("[adminGetDashboardStats] RPC error:", error?.message);
-    throw new Error("Failed to load dashboard operational statistics.");
+    throw new Error(error?.message || "Failed to load dashboard operational statistics.");
   }
 
   return { dashboard: data as unknown as AdminDashboardData };
 });
-

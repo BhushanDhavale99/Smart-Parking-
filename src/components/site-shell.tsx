@@ -30,6 +30,9 @@ import { ThemeSelector } from "@/components/ThemeSelector";
 import { NavigationProgress } from "@/components/navigation-progress";
 import { useRealtimeSync } from "@/lib/realtime";
 import { RootSplash } from "@/components/root-splash";
+import { useQueryClient } from "@tanstack/react-query";
+import { useProfile } from "@/hooks/useProfile";
+import { useUnreadNotificationsCount } from "@/hooks/useNotifications";
 
 /** Lazy-loaded heavy effects — never parsed during the login phase */
 const OpeningAnimation = lazy(() =>
@@ -127,10 +130,27 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
+  const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const path = useRouterState({ select: (state) => state.location.pathname });
+
+  const { data: profile } = useProfile();
+  const { data: unreadCount = 0 } = useUnreadNotificationsCount();
+
+  const userFullName = session?.user?.user_metadata?.["full_name"] as string | undefined;
+
+  const displayName =
+    profile?.full_name || userFullName || session?.user?.email?.split("@")[0] || "Account";
+
+  const initials = (profile?.full_name || userFullName || session?.user?.email || "U")
+    .split(" ")
+    .map((w: string) => w[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
 
   useEffect(() => {
     if (!session?.user?.id) {
@@ -190,7 +210,12 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const handleLogout = async () => {
-      await supabase.auth.signOut();
+      try {
+        await supabase.auth.signOut();
+      } catch {
+        // Continue cleanup regardless
+      }
+      queryClient.clear();
       sessionStorage.removeItem("parkgrid_authenticated");
       sessionStorage.removeItem("parkgrid_seen_intro");
       setSession(null);
@@ -198,7 +223,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
     };
     window.addEventListener("parkgrid-logout", handleLogout);
     return () => window.removeEventListener("parkgrid-logout", handleLogout);
-  }, [navigate]);
+  }, [navigate, queryClient]);
 
   useEffect(() => {
     if (!authInitialized) return;
@@ -233,6 +258,24 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
   const supportActive = supportLinks.some(([to]) => isActive(to));
 
   const isAdminRoute = path === "/admin" || path.startsWith("/admin/");
+
+  // Enforce admin isolation: admin accounts only view admin console, not member site
+  useEffect(() => {
+    if (isAdmin && !isAdminRoute && !isAuthPage) {
+      navigate({ to: "/admin", replace: true });
+    }
+  }, [isAdmin, isAdminRoute, isAuthPage, navigate]);
+
+  if (isAdmin && !isAdminRoute && !isAuthPage) {
+    return (
+      <div className="min-h-screen bg-background grid place-items-center text-foreground font-mono">
+        <div className="flex flex-col items-center gap-3">
+          <div className="size-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+          <p className="text-xs text-muted-foreground">Redirecting to ParkGrid Admin...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (isHomePage && (!authInitialized || !session)) {
     return <RootSplash />;
@@ -362,13 +405,37 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
             {session ? (
               <>
                 <Link to="/profile" className="hidden sm:block" aria-label="Profile">
-                  <Button size="icon" variant="ghost" aria-label="Profile">
-                    <UserRound />
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="flex items-center gap-2 px-2.5 h-9"
+                    aria-label="Profile"
+                  >
+                    <span className="grid size-6 place-items-center rounded-full bg-primary/10 text-[11px] font-bold text-primary border border-primary/20">
+                      {initials}
+                    </span>
+                    <span className="hidden md:inline text-xs font-medium max-w-[120px] truncate">
+                      {displayName}
+                    </span>
                   </Button>
                 </Link>
-                <Link to="/notifications" className="hidden sm:block" aria-label="Notifications">
-                  <Button size="icon" variant="ghost" aria-label="Notifications">
-                    <Bell />
+                <Link
+                  to="/notifications"
+                  className="relative hidden sm:block"
+                  aria-label="Notifications"
+                >
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    aria-label="Notifications"
+                    className="relative"
+                  >
+                    <Bell className="size-5" />
+                    {unreadCount > 0 && (
+                      <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">
+                        {unreadCount > 99 ? "99+" : unreadCount}
+                      </span>
+                    )}
                   </Button>
                 </Link>
               </>
@@ -488,11 +555,28 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
               {session ? (
                 <div className="grid gap-1">
                   <Link
+                    to="/notifications"
+                    onClick={() => setOpen(false)}
+                    className="flex items-center justify-between rounded-lg px-3.5 py-2.5 text-sm text-foreground transition hover:bg-accent"
+                  >
+                    <span className="flex items-center gap-2">
+                      <Bell className="size-4 text-primary" /> Notifications
+                    </span>
+                    {unreadCount > 0 && (
+                      <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold text-primary-foreground">
+                        {unreadCount > 99 ? "99+" : unreadCount}
+                      </span>
+                    )}
+                  </Link>
+                  <Link
                     to="/profile"
                     onClick={() => setOpen(false)}
                     className="flex items-center gap-2 rounded-lg px-3.5 py-2.5 text-sm text-foreground transition hover:bg-accent"
                   >
-                    <UserRound className="size-4 text-primary" /> Profile &amp; Settings
+                    <span className="grid size-5 place-items-center rounded-full bg-primary/10 text-[10px] font-bold text-primary border border-primary/20">
+                      {initials}
+                    </span>
+                    <span className="truncate">{displayName}</span>
                   </Link>
                   <button
                     type="button"

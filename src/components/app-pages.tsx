@@ -8,6 +8,7 @@ import {
   AlertCircle,
   ArrowRight,
   BatteryCharging,
+  Bell,
   Bike,
   Bot,
   BookOpen,
@@ -121,7 +122,16 @@ import {
   type MyBookingRow,
   type BookingStatus,
 } from "@/hooks/useBookings";
-import { usePayBooking, useGetReceipt, type PaymentRow } from "@/hooks/usePayments";
+import { usePayBooking, useGetReceipt } from "@/hooks/usePayments";
+import { useProfile, useUpdateProfile, useRecentBookings } from "@/hooks/useProfile";
+import {
+  useNotifications,
+  useUnreadNotificationsCount,
+  useMarkNotificationsRead,
+  useMarkAllNotificationsRead,
+  useDeleteNotification,
+  type NotificationRow,
+} from "@/hooks/useNotifications";
 import {
   useActiveSession,
   useEndSession,
@@ -3094,55 +3104,131 @@ export function AssistantPage() {
 
 export function ProfilePage() {
   const navigate = useNavigate();
-  const { data: userVehicles } = useVehicles();
+
+  const [activeTab, setActiveTab] = useState<"Profile" | "Vehicles" | "Bookings" | "Notifications">(
+    "Profile",
+  );
+
+  // Real Profile hook
+  const {
+    data: profile,
+    isLoading: isProfileLoading,
+    isError: isProfileError,
+    error: profileError,
+    refetch: refetchProfile,
+  } = useProfile();
+  const updateProfileMutation = useUpdateProfile();
+
+  // Real Vehicles hook
+  const { data: userVehicles = [], isLoading: isVehiclesLoading } = useVehicles();
+  const setDefaultVehicleMutation = useSetDefaultVehicle();
+
+  // Real Recent Bookings hook
+  const { data: recentBookings = [], isLoading: isBookingsLoading } = useRecentBookings();
+
+  // Profile form state
+  const [fullName, setFullName] = useState("");
+  const [phone, setPhone] = useState("");
+
+  useEffect(() => {
+    if (profile) {
+      setFullName(profile.full_name ?? "");
+      setPhone(profile.phone ?? "");
+    }
+  }, [profile]);
+
+  // Single default vehicle resolution
+  const defaultVehicleId = userVehicles.find((v) => v.is_default)?.id;
   const preferredVehicle =
-    userVehicles?.find((v) => v.is_default)?.plate_number ??
-    userVehicles?.[0]?.plate_number ??
+    userVehicles.find((v) => v.id === defaultVehicleId)?.plate_number ??
+    userVehicles[0]?.plate_number ??
     "None registered";
 
-  const [activeTab, setActiveTab] = useState<"Profile" | "Payment methods">("Profile");
+  // Initials
+  const initials = (profile?.full_name || profile?.email || "U")
+    .split(" ")
+    .map((w) => w[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
 
-  const navMap: Record<string, "/vehicles" | "/bookings" | "/notifications"> = {
-    Vehicles: "/vehicles",
-    Bookings: "/bookings",
-    Notifications: "/notifications",
+  // Member since in IST
+  const memberSince = profile?.created_at
+    ? new Date(profile.created_at).toLocaleDateString("en-IN", {
+        timeZone: "Asia/Kolkata",
+        month: "long",
+        year: "numeric",
+      })
+    : "Recently";
+
+  // Handle Save Profile
+  const handleSaveProfile = async () => {
+    const trimmedName = fullName.trim();
+    if (trimmedName.length < 2 || trimmedName.length > 80) {
+      toast.error("Full name must be between 2 and 80 characters.");
+      return;
+    }
+
+    const trimmedPhone = phone.trim();
+    if (trimmedPhone) {
+      const cleaned = trimmedPhone.replace(/[\s-]/g, "");
+      if (!/^(?:\+91|91|0)?[6-9]\d{9}$/.test(cleaned)) {
+        toast.error("Please enter a valid 10-digit Indian mobile number starting with 6-9.");
+        return;
+      }
+    }
+
+    try {
+      await updateProfileMutation.mutateAsync({
+        full_name: trimmedName,
+        phone: trimmedPhone || null,
+      });
+      toast.success("Profile updated successfully!");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to update profile";
+      toast.error(msg);
+    }
   };
+
+  // Handle Set Default Vehicle
+  const handleSetDefault = async (vehicleId: string, plate: string) => {
+    try {
+      await setDefaultVehicleMutation.mutateAsync(vehicleId);
+      toast.success(`${plate} is now your default vehicle.`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to set default vehicle";
+      toast.error(msg);
+    }
+  };
+
+  const tabs: Array<"Profile" | "Vehicles" | "Bookings" | "Notifications" | "Logout"> = [
+    "Profile",
+    "Vehicles",
+    "Bookings",
+    "Notifications",
+    "Logout",
+  ];
+
   return (
     <PageFrame eyebrow="Your account" title="Profile & settings">
       <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
-        <aside className="border border-border bg-surface p-3">
-          {[
-            "Profile",
-            "Vehicles",
-            "Bookings",
-            "Payment methods",
-            "Notifications",
-            "Security",
-            "Logout",
-          ].map((x) => {
-            const isSelected =
-              (x === "Profile" && activeTab === "Profile") ||
-              (x === "Payment methods" && activeTab === "Payment methods");
+        <aside className="border border-border bg-surface p-3 h-fit rounded-xl">
+          {tabs.map((x) => {
+            const isSelected = x === activeTab;
             return (
               <Button
                 key={x}
                 variant={isSelected ? "secondary" : "ghost"}
-                className="w-full justify-start"
+                className={cn(
+                  "w-full justify-start",
+                  x === "Logout" && "text-destructive hover:bg-destructive/10",
+                )}
                 onClick={() => {
                   if (x === "Logout") {
-                    sessionStorage.removeItem("parkgrid_authenticated");
-                    sessionStorage.removeItem("parkgrid_seen_intro");
                     window.dispatchEvent(new CustomEvent("parkgrid-logout"));
-                    toast.info("Logged out of ParkGrid");
-                  } else if (x === "Payment methods") {
-                    setActiveTab("Payment methods");
-                  } else if (x === "Profile") {
-                    setActiveTab("Profile");
                   } else {
-                    const target = navMap[x];
-                    if (target) {
-                      navigate({ to: target });
-                    }
+                    setActiveTab(x);
                   }
                 }}
               >
@@ -3152,132 +3238,355 @@ export function ProfilePage() {
           })}
         </aside>
 
-        {activeTab === "Payment methods" ? (
+        {/* ── TAB 1: Profile ── */}
+        {activeTab === "Profile" && (
+          <div className="rounded-2xl border border-border/80 bg-surface/95 p-6 sm:p-8 shadow-sm">
+            {isProfileLoading && (
+              <div className="animate-pulse space-y-6">
+                <div className="flex items-center gap-4">
+                  <div className="size-16 rounded-full bg-muted/40" />
+                  <div className="space-y-2">
+                    <div className="h-6 w-48 rounded bg-muted/40" />
+                    <div className="h-4 w-32 rounded bg-muted/40" />
+                  </div>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2 pt-6">
+                  <div className="h-10 rounded bg-muted/40" />
+                  <div className="h-10 rounded bg-muted/40" />
+                </div>
+              </div>
+            )}
+
+            {isProfileError && (
+              <div className="border border-destructive/40 bg-destructive/5 p-6 text-center rounded-xl">
+                <AlertCircle className="mx-auto size-8 text-destructive" />
+                <h3 className="mt-3 font-display text-lg">Unable to load your profile</h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {profileError instanceof Error
+                    ? profileError.message
+                    : "An unexpected error occurred."}
+                </p>
+                <Button
+                  className="mt-4"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => refetchProfile()}
+                >
+                  <RotateCw className="mr-2 size-4" /> Try again
+                </Button>
+              </div>
+            )}
+
+            {!isProfileLoading && !isProfileError && (
+              <>
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <span className="grid size-16 place-items-center rounded-full bg-primary/10 font-display text-xl font-bold text-primary border border-primary/20 shadow-[0_0_15px_var(--primary-glow)]">
+                      {initials}
+                    </span>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h2 className="font-display text-2xl font-bold">
+                          {profile?.full_name || "Member"}
+                        </h2>
+                        <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-[10px] font-mono font-semibold uppercase text-primary border border-primary/20">
+                          {profile?.role || "member"}
+                        </span>
+                      </div>
+                      <p className="text-sm text-muted-foreground">Member since {memberSince}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-8 grid gap-4 sm:grid-cols-2">
+                  <label className="field-label">
+                    Full name
+                    <input
+                      className="field-input"
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      placeholder="Your full name"
+                      maxLength={80}
+                    />
+                  </label>
+                  <label className="field-label">
+                    Email
+                    <input
+                      className="field-input bg-muted/30 cursor-not-allowed opacity-80"
+                      value={profile?.email ?? ""}
+                      readOnly
+                      title="Email is managed through system authentication"
+                    />
+                    <span className="text-[11px] text-muted-foreground mt-1">
+                      To change your email, contact support
+                    </span>
+                  </label>
+                  <label className="field-label">
+                    Phone
+                    <input
+                      className="field-input font-mono"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder="+91 98765 43210"
+                    />
+                    <span className="text-[11px] text-muted-foreground mt-1">
+                      10-digit Indian mobile (starts 6-9, optional +91)
+                    </span>
+                  </label>
+                  <label className="field-label">
+                    Preferred vehicle
+                    <input
+                      className="field-input font-mono bg-muted/30 cursor-default"
+                      value={preferredVehicle}
+                      readOnly
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("Vehicles")}
+                      className="text-[11px] text-primary hover:underline mt-1 text-left"
+                    >
+                      Manage default vehicle &rarr;
+                    </button>
+                  </label>
+                </div>
+
+                <Button
+                  className="mt-6"
+                  onClick={handleSaveProfile}
+                  disabled={updateProfileMutation.isPending}
+                >
+                  {updateProfileMutation.isPending ? "Saving changes..." : "Save changes"}
+                </Button>
+
+                <div className="mt-10 border-t border-border/60 pt-8">
+                  <div className="mb-4">
+                    <h3 className="font-display text-xl font-semibold">Theme &amp; Appearance</h3>
+                    <p className="text-xs text-muted-foreground">
+                      Select your visual theme. Changes apply instantly and persist across sessions.
+                    </p>
+                  </div>
+                  <ThemeSelector variant="grid" />
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* ── TAB 2: Vehicles ── */}
+        {activeTab === "Vehicles" && (
           <div className="rounded-2xl border border-border/80 bg-surface/95 p-6 sm:p-8 shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
-                <h2 className="font-display text-2xl">Payment methods</h2>
+                <h2 className="font-display text-2xl font-bold">Your Garage</h2>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Manage saved cards and UPI IDs for express parking checkout.
+                  Exactly one default vehicle is used for automated entry and quick checkout.
                 </p>
               </div>
-              <span className="rounded-full bg-amber-500/10 px-3 py-1 font-mono text-[11px] font-semibold text-amber-500 border border-amber-500/30">
-                Demo only, nothing is stored
-              </span>
+              <Button size="sm" onClick={() => navigate({ to: "/vehicles" })}>
+                <Plus className="mr-1.5 size-4" /> Manage garage
+              </Button>
             </div>
 
-            <div className="mt-6 flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 text-xs text-muted-foreground">
-              <ShieldCheck className="size-5 shrink-0 text-amber-500 mt-0.5" />
-              <div>
-                <strong className="block text-foreground font-medium">
-                  Sandbox Simulation Environment
-                </strong>
-                <p className="mt-0.5 leading-relaxed">
-                  Demo only, nothing is stored. Real card numbers, CVV codes, bank PINs, or
-                  sensitive credentials are never collected, stored, or transmitted to our servers.
+            {isVehiclesLoading && (
+              <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                {[1, 2].map((n) => (
+                  <div
+                    key={n}
+                    className="border border-border bg-surface/50 p-5 rounded-xl animate-pulse h-28"
+                  />
+                ))}
+              </div>
+            )}
+
+            {!isVehiclesLoading && userVehicles.length === 0 && (
+              <div className="mt-6 rounded-xl border border-dashed border-border p-8 text-center">
+                <CarFront className="mx-auto size-10 text-muted-foreground" />
+                <h4 className="mt-3 font-semibold">No vehicles registered</h4>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Add a vehicle to automate booking assignment and parking bay entry.
                 </p>
+                <Button size="sm" className="mt-4" onClick={() => navigate({ to: "/vehicles" })}>
+                  Register vehicle
+                </Button>
               </div>
-            </div>
+            )}
 
-            <div className="mt-6 space-y-3">
-              <div className="flex items-center justify-between rounded-xl border border-border/80 bg-background/90 p-4 shadow-xs">
-                <div className="flex items-center gap-3">
-                  <div className="grid size-10 place-items-center rounded-lg bg-primary/10 text-primary">
-                    <CreditCard className="size-5" />
-                  </div>
-                  <div>
-                    <strong className="block text-sm text-foreground">
-                      HDFC Bank Regalia •••• 4242
-                    </strong>
-                    <span className="text-xs text-muted-foreground">
-                      Expires 08/29 · Visa Credit
-                    </span>
-                  </div>
-                </div>
-                <span className="rounded-full border border-primary/30 bg-primary/10 px-2.5 py-0.5 font-mono text-[10px] font-semibold text-primary">
-                  Default
-                </span>
+            {!isVehiclesLoading && userVehicles.length > 0 && (
+              <div className="mt-6 space-y-3">
+                {userVehicles.map((vehicle) => {
+                  const isThisVehicleDefault = vehicle.id === defaultVehicleId;
+                  const title =
+                    vehicle.make && vehicle.model
+                      ? `${vehicle.make} ${vehicle.model}`
+                      : vehicle.make || vehicle.model || vehicle.vehicle_type.toUpperCase();
+
+                  return (
+                    <div
+                      key={vehicle.id}
+                      className={cn(
+                        "flex items-center justify-between rounded-xl border p-4 shadow-xs transition-all",
+                        isThisVehicleDefault
+                          ? "border-primary/40 bg-primary/5"
+                          : "border-border/80 bg-background/90",
+                      )}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="grid size-10 place-items-center rounded-lg bg-primary/10 text-primary">
+                          {vehicle.is_ev ? (
+                            <Zap className="size-5" />
+                          ) : (
+                            <CarFront className="size-5" />
+                          )}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <strong className="text-sm font-semibold text-foreground">
+                              {title}
+                            </strong>
+                            <span className="font-mono text-xs px-2 py-0.5 rounded bg-muted/40 text-foreground font-bold">
+                              {vehicle.plate_number}
+                            </span>
+                          </div>
+                          <span className="text-xs text-muted-foreground capitalize">
+                            {vehicle.vehicle_type} {vehicle.color ? `· ${vehicle.color}` : ""}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        {isThisVehicleDefault ? (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-0.5 font-mono text-[10px] font-semibold text-primary">
+                            <Star className="size-3 fill-primary" /> Default
+                          </span>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-xs"
+                            disabled={setDefaultVehicleMutation.isPending}
+                            onClick={() => handleSetDefault(vehicle.id, vehicle.plate_number)}
+                          >
+                            Set as default
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-
-              <div className="flex items-center justify-between rounded-xl border border-border/80 bg-background/90 p-4 shadow-xs">
-                <div className="flex items-center gap-3">
-                  <div className="grid size-10 place-items-center rounded-lg bg-muted/30 text-muted-foreground">
-                    <Sparkles className="size-5" />
-                  </div>
-                  <div>
-                    <strong className="block text-sm text-foreground">bhushan@oksbi</strong>
-                    <span className="text-xs text-muted-foreground">UPI Autopay · Verified</span>
-                  </div>
-                </div>
-                <span className="font-mono text-xs text-muted-foreground">Active</span>
-              </div>
-
-              <div className="flex items-center justify-between rounded-xl border border-border/80 bg-background/90 p-4 shadow-xs">
-                <div className="flex items-center gap-3">
-                  <div className="grid size-10 place-items-center rounded-lg bg-muted/30 text-muted-foreground">
-                    <CreditCard className="size-5" />
-                  </div>
-                  <div>
-                    <strong className="block text-sm text-foreground">
-                      ICICI Coral RuPay •••• 8821
-                    </strong>
-                    <span className="text-xs text-muted-foreground">
-                      Expires 11/30 · RuPay Platinum
-                    </span>
-                  </div>
-                </div>
-                <span className="font-mono text-xs text-muted-foreground">Active</span>
-              </div>
-            </div>
-
-            <Button
-              className="mt-6"
-              variant="outline"
-              onClick={() =>
-                toast.info("Demo only: Payment method management is simulated in sandbox mode.")
-              }
-            >
-              + Add payment method
-            </Button>
+            )}
           </div>
-        ) : (
+        )}
+
+        {/* ── TAB 3: Bookings ── */}
+        {activeTab === "Bookings" && (
           <div className="rounded-2xl border border-border/80 bg-surface/95 p-6 sm:p-8 shadow-sm">
-            <div className="flex items-center gap-4">
-              <span className="grid size-16 place-items-center rounded-full bg-primary/10 font-display text-xl font-bold text-primary border border-primary/20 shadow-[0_0_15px_var(--primary-glow)]">
-                BD
-              </span>
+            <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
-                <h2 className="font-display text-2xl font-bold">Bhushan Dhavale</h2>
-                <p className="text-sm text-muted-foreground">Member since September 2026</p>
-              </div>
-            </div>
-            <div className="mt-8 grid gap-4 sm:grid-cols-2">
-              <label className="field-label">
-                Full name
-                <input className="field-input" defaultValue="Bhushan Dhavale" />
-              </label>
-              <label className="field-label">
-                Email
-                <input className="field-input" defaultValue="bhushan@example.com" />
-              </label>
-              <label className="field-label">
-                Phone
-                <input className="field-input" defaultValue="+91 98765 43210" />
-              </label>
-              <label className="field-label">
-                Preferred vehicle
-                <input className="field-input font-mono" value={preferredVehicle} readOnly />
-              </label>
-            </div>
-            <Button className="mt-6">Save changes</Button>
-            <div className="mt-10 border-t border-border/60 pt-8">
-              <div className="mb-4">
-                <h3 className="font-display text-xl font-semibold">Theme & Appearance</h3>
-                <p className="text-xs text-muted-foreground">
-                  Select your visual theme. Changes apply instantly and persist across sessions.
+                <h2 className="font-display text-2xl font-bold">Recent Bookings</h2>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Your 5 most recent parking reservations.
                 </p>
               </div>
-              <ThemeSelector variant="grid" />
+              <Button size="sm" variant="outline" onClick={() => navigate({ to: "/bookings" })}>
+                View all bookings &rarr;
+              </Button>
+            </div>
+
+            {isBookingsLoading && (
+              <div className="mt-6 space-y-3">
+                {[1, 2, 3].map((n) => (
+                  <div
+                    key={n}
+                    className="border border-border bg-surface/50 p-4 rounded-xl animate-pulse h-16"
+                  />
+                ))}
+              </div>
+            )}
+
+            {!isBookingsLoading && recentBookings.length === 0 && (
+              <div className="mt-6 rounded-xl border border-dashed border-border p-8 text-center">
+                <CalendarDays className="mx-auto size-10 text-muted-foreground" />
+                <h4 className="mt-3 font-semibold">No bookings found</h4>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Reserve a parking bay at ParkGrid One in seconds.
+                </p>
+                <Button size="sm" className="mt-4" onClick={() => navigate({ to: "/parking" })}>
+                  Book parking
+                </Button>
+              </div>
+            )}
+
+            {!isBookingsLoading && recentBookings.length > 0 && (
+              <div className="mt-6 space-y-3">
+                {recentBookings.map((b) => {
+                  const istDate = formatIstDateTime(b.start_at);
+                  const slotCode = b.parking_slots?.code ?? "Assigned";
+                  return (
+                    <div
+                      key={b.id}
+                      className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/80 bg-background/90 p-4 shadow-xs"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="grid size-10 place-items-center rounded-lg bg-primary/10 text-primary">
+                          <SquareParking className="size-5" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <strong className="font-mono text-sm text-foreground">
+                              {b.reference}
+                            </strong>
+                            <span className="font-mono text-xs px-2 py-0.5 rounded bg-muted/30 text-primary font-bold">
+                              Slot {slotCode}
+                            </span>
+                          </div>
+                          <span className="text-xs text-muted-foreground">{istDate}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <span className="font-mono text-sm font-semibold">
+                          {formatPaise(b.total_paise)}
+                        </span>
+                        <StatusBadge status={b.status} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── TAB 4: Notifications ── */}
+        {activeTab === "Notifications" && (
+          <div className="rounded-2xl border border-border/80 bg-surface/95 p-6 sm:p-8 shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className="grid size-10 place-items-center rounded-lg bg-primary/10 text-primary">
+                <Bell className="size-5" />
+              </div>
+              <div>
+                <h2 className="font-display text-2xl font-bold">Notifications</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Real-time updates regarding bookings, payments, and parking sessions.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 rounded-xl border border-border/80 bg-background/80 p-5 space-y-3">
+              <p className="text-sm text-foreground leading-relaxed">
+                Notifications appear in the bell icon in the top header and on the dedicated
+                Notifications page.
+              </p>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                You will receive alerts whenever your booking status changes (confirmed, cancelled,
+                no-show), when parking sessions start or end, and when payment receipts are issued.
+              </p>
+              <div className="pt-2">
+                <Button onClick={() => navigate({ to: "/notifications" })}>
+                  Open Notifications Page &rarr;
+                </Button>
+              </div>
             </div>
           </div>
         )}
@@ -3659,29 +3968,266 @@ export function KnowledgePage() {
 }
 
 export function NotificationsPage() {
-  const rows = [
-    ["Booking confirmed", "Your slot A12 is reserved.", "Just now", Check],
-    ["Parking starting soon", "Your booking starts in 30 minutes.", "12 min", Clock3],
-    ["Payment successful", "₹118 paid for SP-20260920-10231.", "14 min", WalletCards],
-    ["EV charging completed", "Charger 01 reached your target.", "Yesterday", BatteryCharging],
-  ] as const;
+  const navigate = useNavigate();
+  const [filter, setFilter] = useState<"all" | "unread">("all");
+  const [page, setPage] = useState(1);
+
+  // Real Notifications hooks
+  const { data, isLoading, isError, error, refetch } = useNotifications(filter, page, 20);
+  const { data: unreadCount = 0 } = useUnreadNotificationsCount();
+  const markReadMutation = useMarkNotificationsRead();
+  const markAllReadMutation = useMarkAllNotificationsRead();
+  const deleteMutation = useDeleteNotification();
+
+  const notifications = data?.notifications ?? [];
+  const totalPages = data?.totalPages ?? 1;
+
+  const handleNotificationClick = async (notif: NotificationRow) => {
+    if (!notif.is_read) {
+      try {
+        await markReadMutation.mutateAsync([notif.id]);
+      } catch {
+        // silent
+      }
+    }
+    if (notif.link) {
+      if (notif.link.startsWith("/")) {
+        navigate({ to: notif.link as "/bookings" | "/profile" | "/vehicles" });
+      }
+    }
+  };
+
+  const handleDelete = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    try {
+      await deleteMutation.mutateAsync(id);
+      toast.success("Notification deleted");
+    } catch {
+      toast.error("Failed to delete notification");
+    }
+  };
+
+  const handleMarkAllRead = async () => {
+    try {
+      await markAllReadMutation.mutateAsync();
+      toast.success("All notifications marked as read");
+    } catch {
+      toast.error("Failed to mark all as read");
+    }
+  };
+
+  const formatRelativeTime = (dateStr: string): string => {
+    const diff = Math.max(0, Date.now() - new Date(dateStr).getTime());
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return "Just now";
+    if (mins < 60) return `${mins}m ago`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    if (days === 1) return "Yesterday";
+    if (days < 7) return `${days}d ago`;
+    return new Date(dateStr).toLocaleDateString("en-IN", {
+      timeZone: "Asia/Kolkata",
+      day: "numeric",
+      month: "short",
+    });
+  };
+
+  const formatExactIST = (dateStr: string): string => {
+    return new Date(dateStr).toLocaleString("en-IN", {
+      timeZone: "Asia/Kolkata",
+      dateStyle: "medium",
+      timeStyle: "short",
+    });
+  };
+
+  const getNoticeIcon = (type: string) => {
+    switch (type) {
+      case "booking":
+        return CarFront;
+      case "payment":
+        return WalletCards;
+      case "session":
+        return Clock3;
+      default:
+        return Bell;
+    }
+  };
+
   return (
     <PageFrame eyebrow="Updates" title="Notifications">
-      <div className="max-w-4xl divide-y divide-border/60 rounded-2xl border border-border/80 bg-surface/95 shadow-sm overflow-hidden">
-        {rows.map(([title, copy, time, NoticeIcon]) => (
-          <div key={title} className="flex gap-4 p-5 transition-colors hover:bg-muted/20">
-            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary border border-primary/20 shadow-sm">
-              <NoticeIcon className="size-4" />
-            </span>
-            <div className="flex-1 min-w-0">
-              <strong className="block text-sm font-semibold">{title}</strong>
-              <p className="mt-0.5 text-sm text-muted-foreground leading-relaxed">{copy}</p>
-            </div>
-            <time className="shrink-0 font-mono text-[11px] text-muted-foreground pt-0.5">
-              {time}
-            </time>
+      <div className="max-w-4xl space-y-4">
+        {/* Controls Bar */}
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border/80 bg-surface/95 p-3.5 shadow-sm">
+          <div className="flex items-center gap-1.5">
+            <Button
+              size="sm"
+              variant={filter === "all" ? "secondary" : "ghost"}
+              onClick={() => {
+                setFilter("all");
+                setPage(1);
+              }}
+              className="text-xs font-semibold"
+            >
+              All
+            </Button>
+            <Button
+              size="sm"
+              variant={filter === "unread" ? "secondary" : "ghost"}
+              onClick={() => {
+                setFilter("unread");
+                setPage(1);
+              }}
+              className="text-xs font-semibold"
+            >
+              Unread
+              {unreadCount > 0 && (
+                <span className="ml-1.5 rounded-full bg-primary/20 px-1.5 py-0.2 text-[10px] font-bold text-primary">
+                  {unreadCount}
+                </span>
+              )}
+            </Button>
           </div>
-        ))}
+
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={handleMarkAllRead}
+            disabled={unreadCount === 0 || markAllReadMutation.isPending}
+            className="text-xs text-muted-foreground hover:text-foreground"
+          >
+            <Check className="mr-1.5 size-3.5" />
+            {markAllReadMutation.isPending ? "Marking..." : "Mark all as read"}
+          </Button>
+        </div>
+
+        {/* Loading State */}
+        {isLoading && (
+          <div className="divide-y divide-border/60 rounded-2xl border border-border/80 bg-surface/95 shadow-sm overflow-hidden">
+            {[1, 2, 3, 4].map((n) => (
+              <div key={n} className="flex gap-4 p-5 animate-pulse">
+                <div className="size-10 rounded-xl bg-muted/40 shrink-0" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 w-48 rounded bg-muted/40" />
+                  <div className="h-3 w-3/4 rounded bg-muted/40" />
+                </div>
+                <div className="h-3 w-16 rounded bg-muted/40 shrink-0" />
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Error State */}
+        {isError && (
+          <div className="border border-destructive/40 bg-destructive/5 p-6 text-center rounded-2xl">
+            <AlertCircle className="mx-auto size-8 text-destructive" />
+            <h3 className="mt-3 font-display text-lg font-semibold">
+              Unable to load notifications
+            </h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {error instanceof Error ? error.message : "An unexpected error occurred."}
+            </p>
+            <Button className="mt-4" variant="outline" size="sm" onClick={() => refetch()}>
+              <RotateCw className="mr-2 size-4" /> Try again
+            </Button>
+          </div>
+        )}
+
+        {/* Empty State */}
+        {!isLoading && !isError && notifications.length === 0 && (
+          <div className="rounded-2xl border border-dashed border-border/80 bg-surface/50 p-12 text-center shadow-sm">
+            <Bell className="mx-auto size-12 text-muted-foreground/60" />
+            <h3 className="mt-4 font-display text-xl font-semibold">No notifications</h3>
+            <p className="mt-1 text-sm text-muted-foreground max-w-sm mx-auto">
+              {filter === "unread"
+                ? "You have caught up with everything! No unread notifications."
+                : "You have no notifications yet. Key booking, parking, and payment updates will appear here."}
+            </p>
+          </div>
+        )}
+
+        {/* Notifications List */}
+        {!isLoading && !isError && notifications.length > 0 && (
+          <div className="divide-y divide-border/60 rounded-2xl border border-border/80 bg-surface/95 shadow-sm overflow-hidden">
+            {notifications.map((notif) => {
+              const NoticeIcon = getNoticeIcon(notif.type);
+              const relativeTime = formatRelativeTime(notif.created_at);
+              const exactIST = formatExactIST(notif.created_at);
+              const copy = notif.body || notif.message || "";
+
+              return (
+                <div
+                  key={notif.id}
+                  onClick={() => handleNotificationClick(notif)}
+                  className={cn(
+                    "group relative flex items-start gap-4 p-5 transition-colors cursor-pointer hover:bg-muted/30",
+                    !notif.is_read && "bg-primary/5",
+                  )}
+                >
+                  {/* Unread indicator bar */}
+                  {!notif.is_read && (
+                    <span className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-r" />
+                  )}
+
+                  <span
+                    className={cn(
+                      "grid size-10 shrink-0 place-items-center rounded-xl border shadow-sm transition-transform group-hover:scale-105",
+                      !notif.is_read
+                        ? "bg-primary/15 text-primary border-primary/30"
+                        : "bg-muted/40 text-muted-foreground border-border/60",
+                    )}
+                  >
+                    <NoticeIcon className="size-4" />
+                  </span>
+
+                  <div className="flex-1 min-w-0 pr-2">
+                    <div className="flex items-center gap-2">
+                      <strong
+                        className={cn(
+                          "text-sm font-semibold truncate",
+                          !notif.is_read ? "text-foreground font-bold" : "text-muted-foreground",
+                        )}
+                      >
+                        {notif.title}
+                      </strong>
+                      {!notif.is_read && (
+                        <span className="size-2 rounded-full bg-primary shrink-0" />
+                      )}
+                    </div>
+                    <p className="mt-0.5 text-xs text-muted-foreground leading-relaxed">{copy}</p>
+                  </div>
+
+                  <div className="flex flex-col items-end gap-2 shrink-0">
+                    <time
+                      title={`Exact time: ${exactIST} IST`}
+                      className="font-mono text-[11px] text-muted-foreground pt-0.5 cursor-help hover:text-foreground"
+                    >
+                      {relativeTime}
+                    </time>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="size-7 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                      title="Delete notification"
+                      onClick={(e) => handleDelete(e, notif.id)}
+                    >
+                      <Trash2 className="size-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Pagination / Load more */}
+        {!isLoading && !isError && page < totalPages && (
+          <div className="text-center pt-2">
+            <Button variant="outline" size="sm" onClick={() => setPage((prev) => prev + 1)}>
+              Load more
+            </Button>
+          </div>
+        )}
       </div>
     </PageFrame>
   );

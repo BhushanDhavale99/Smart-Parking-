@@ -22,6 +22,7 @@ import { AVAILABILITY_QUERY_KEY, BOOKINGS_QUERY_KEY, SLOTS_QUERY_KEY } from "@/h
 import { SESSIONS_QUERY_KEY } from "@/hooks/useSessions";
 import { ADMIN_PAYMENTS_QUERY_KEY } from "@/hooks/usePayments";
 import { DASHBOARD_STATS_QUERY_KEY } from "@/hooks/useSettings";
+import { toast } from "sonner";
 
 export interface RealtimeSyncState {
   isLive: boolean;
@@ -48,7 +49,10 @@ function notifyStatusListeners() {
  * Returns fallback polling interval: false if live socket is connected;
  * 60,000 ms (60 seconds) if disconnected or offline.
  */
-export function getRealtimeRefetchInterval(isLive: boolean, fallbackMs: number = 60000): number | false {
+export function getRealtimeRefetchInterval(
+  isLive: boolean,
+  fallbackMs: number = 60000,
+): number | false {
   return isLive ? false : fallbackMs;
 }
 
@@ -253,7 +257,10 @@ export function useRealtimeSync(session: Session | null, isAdmin: boolean = fals
         table: "bookings",
       },
       (payload) => {
-        const row = (payload.new as Record<string, unknown>) || (payload.old as Record<string, unknown>) || {};
+        const row =
+          (payload.new as Record<string, unknown>) ||
+          (payload.old as Record<string, unknown>) ||
+          {};
         const isOwner = row["user_id"] === activeUserId;
 
         const keys: string[] = ["availability", "slots"];
@@ -276,7 +283,10 @@ export function useRealtimeSync(session: Session | null, isAdmin: boolean = fals
         table: "parking_sessions",
       },
       (payload) => {
-        const row = (payload.new as Record<string, unknown>) || (payload.old as Record<string, unknown>) || {};
+        const row =
+          (payload.new as Record<string, unknown>) ||
+          (payload.old as Record<string, unknown>) ||
+          {};
         const isOwner = row["user_id"] === activeUserId;
 
         const keys: string[] = ["availability", "slots", "sessions"];
@@ -301,6 +311,18 @@ export function useRealtimeSync(session: Session | null, isAdmin: boolean = fals
       (payload) => {
         const row = (payload.new as Record<string, unknown>) || {};
         if (row["user_id"] === activeUserId) {
+          if (payload.eventType === "INSERT") {
+            const title = typeof row["title"] === "string" ? row["title"] : "New notification";
+            const body =
+              typeof row["body"] === "string"
+                ? row["body"]
+                : typeof row["message"] === "string"
+                  ? row["message"]
+                  : undefined;
+            toast.info(title, {
+              description: body,
+            });
+          }
           scheduleInvalidation(["notifications"]);
         }
       },
