@@ -12,7 +12,12 @@ import {
   adminOverrideBooking,
   type BookingRow,
 } from "@/lib/bookings.server";
-import { listSlots, type ListSlotsInput, type ParkingSlotWithOccupancy } from "@/lib/parking.server";
+import {
+  listSlots,
+  getFacilitySummary,
+  type ListSlotsInput,
+  type ParkingSlotWithOccupancy,
+} from "@/lib/parking.server";
 import { SESSIONS_QUERY_KEY } from "./useSessions";
 import { PAYMENTS_QUERY_KEY } from "./usePayments";
 
@@ -63,13 +68,28 @@ export const SLOTS_QUERY_KEY = ["slots"] as const;
  * Invalidate all interdependent parking, slot, booking, session, and administrative queries.
  * Called whenever a booking is created, confirmed, paid, cancelled, or overridden.
  */
+export const FACILITY_SUMMARY_QUERY_KEY = ["facility-summary"] as const;
+
 export function invalidateBookingRelatedQueries(queryClient: QueryClient) {
   queryClient.invalidateQueries({ queryKey: AVAILABILITY_QUERY_KEY });
   queryClient.invalidateQueries({ queryKey: SLOTS_QUERY_KEY });
   queryClient.invalidateQueries({ queryKey: BOOKINGS_QUERY_KEY });
   queryClient.invalidateQueries({ queryKey: SESSIONS_QUERY_KEY });
   queryClient.invalidateQueries({ queryKey: PAYMENTS_QUERY_KEY });
+  queryClient.invalidateQueries({ queryKey: FACILITY_SUMMARY_QUERY_KEY });
   queryClient.invalidateQueries({ queryKey: ["admin"] });
+}
+
+export function useFacilitySummary() {
+  return useQuery({
+    queryKey: FACILITY_SUMMARY_QUERY_KEY,
+    queryFn: async () => {
+      const res = await getFacilitySummary();
+      return res;
+    },
+    staleTime: 1000 * 10,
+    refetchInterval: 1000 * 30, // 30s live fallback (Realtime pushes updates instantly)
+  });
 }
 
 export function useParkingSlots(params: Partial<ListSlotsInput> = {}) {

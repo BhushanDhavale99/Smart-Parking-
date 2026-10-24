@@ -39,6 +39,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { SpotlightCard, BlurText } from "@/components/react-bits";
 import { FAQ_CATEGORIES, FAQ_DATABASE, type FAQCategory, type FAQItem } from "@/lib/faq-rag-data";
 
 export function HelpCenterPage() {
@@ -193,13 +194,18 @@ export function HelpCenterPage() {
         </Breadcrumb>
 
         {/* ── Hero / Page Header ── */}
-        <div className="relative mb-10 overflow-hidden border border-border bg-surface p-6 sm:p-10">
+        <SpotlightCard
+          spotlightColor="rgba(6, 182, 212, 0.22)"
+          borderColor="rgba(6, 182, 212, 0.45)"
+          className="relative mb-10 overflow-hidden rounded-2xl border border-border/80 bg-surface/90 p-6 sm:p-10 shadow-sm"
+        >
           <div className="max-w-3xl">
             <p className="mb-3 flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.2em] text-primary">
-              <span className="live-dot" aria-hidden="true" /> ParkGrid Knowledge Hub · BKC Mumbai
+              <span className="live-dot" aria-hidden="true" />
+              <span className="text-primary font-mono">ParkGrid Knowledge Hub · BKC Mumbai</span>
             </p>
             <h1 className="font-display text-4xl font-semibold tracking-tight sm:text-5xl">
-              FAQs &amp; Help Center
+              <BlurText text="FAQs & Help Center" delay={80} className="font-display" />
             </h1>
             <p className="mt-4 text-base leading-7 text-muted-foreground sm:text-lg">
               Official guide to ParkGrid One facility rules, parking floors (B1–L2), EV charging,
@@ -216,7 +222,7 @@ export function HelpCenterPage() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search by topic (e.g., heavy vehicles, cancellation refund, EV tariff, QR gate)..."
-                className="w-full rounded-none border border-border bg-background py-3.5 pl-12 pr-10 text-sm placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                className="w-full rounded-xl border border-border bg-background py-3.5 pl-12 pr-10 text-sm placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary shadow-inner"
                 aria-label="Search FAQs"
               />
               {searchQuery && (
@@ -253,7 +259,7 @@ export function HelpCenterPage() {
               ))}
             </div>
           </div>
-        </div>
+        </SpotlightCard>
 
         {/* ── Category Filter Tabs ── */}
         <div className="mb-6">

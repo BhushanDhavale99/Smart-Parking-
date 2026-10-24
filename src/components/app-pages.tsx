@@ -71,6 +71,17 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { Reveal } from "@/components/reveal";
 import {
+  SpotlightCard,
+  BlurText,
+  SplitText,
+  CountUp,
+  Squares,
+  StarBorder,
+  TiltedCard,
+  Aurora,
+  ClickSpark,
+} from "@/components/react-bits";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -112,6 +123,7 @@ import {
 } from "@/hooks/useVehicles";
 import {
   useAvailability,
+  useFacilitySummary,
   useQuoteBooking,
   useCreateBooking,
   useListMyBookings,
@@ -164,6 +176,16 @@ const iconSet = [
   Headphones,
 ];
 export function HomePage() {
+  const { data: summary } = useFacilitySummary();
+
+  const totalSlots = summary?.totalSlots ?? 150;
+  const availableSlots = summary?.availableSlots ?? 150;
+  const occupiedSlots = summary?.occupiedSlots ?? 0;
+  const reservedSlots = summary?.reservedSlots ?? 0;
+  const evReadySlots = summary?.evReadySlots ?? 12;
+  const percentage =
+    summary?.percentage ?? (totalSlots > 0 ? Math.round((availableSlots / totalSlots) * 100) : 100);
+
   return (
     <>
       <section className="relative flex min-h-[92vh] items-end overflow-hidden pt-24">
@@ -175,27 +197,41 @@ export function HomePage() {
           className="absolute inset-0 size-full object-cover"
         />
         <div className="hero-scrim absolute inset-0" />
-        <div className="relative mx-auto grid w-full max-w-[1440px] gap-10 px-6 pb-12 lg:grid-cols-[1fr_420px] lg:px-10 lg:pb-20">
+        <Aurora className="opacity-30 z-0" />
+        <div className="absolute inset-0 z-[1] pointer-events-none opacity-45 mix-blend-screen">
+          <Squares
+            direction="diagonal"
+            speed={0.4}
+            squareSize={48}
+            borderColor="rgba(6, 182, 212, 0.12)"
+            hoverFillColor="rgba(6, 182, 212, 0.25)"
+            className="size-full"
+          />
+        </div>
+        <div className="relative z-10 mx-auto grid w-full max-w-[1440px] gap-10 px-6 pb-12 lg:grid-cols-[1fr_420px] lg:px-10 lg:pb-20">
           <div className="page-reveal max-w-3xl self-end text-hero-foreground">
             <p className="mb-5 flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.2em]">
-              <span className="live-dot" /> Live at BKC, Mumbai
+              <span className="live-dot" />{" "}
+              <span className="text-hero-foreground font-mono">LIVE AT BKC, MUMBAI</span>
             </p>
             <h1 className="font-display text-5xl font-semibold leading-[0.98] sm:text-7xl lg:text-8xl">
-              Smart parking.
+              <SplitText text="Smart parking." delay={60} duration={0.6} className="text-white" />
               <br />
               <span className="text-hero-foreground">Simple. Fast.</span>{" "}
-              <span className="text-primary">Secure.</span>
+              <span className="text-primary font-bold">Secure.</span>
             </h1>
             <p className="mt-6 max-w-2xl text-base leading-7 text-hero-muted sm:text-lg">
               Reserve a verified bay, enter with QR, and park without the search. ParkGrid One
               brings intelligent access, EV charging, and round-the-clock security to BKC, Mumbai.
             </p>
-            <div className="mt-8 flex flex-wrap gap-3">
-              <Link to="/parking">
-                <Button size="lg">
-                  Book parking <ArrowRight />
-                </Button>
-              </Link>
+            <div className="mt-8 flex flex-wrap items-center gap-3">
+              <ClickSpark sparkColor="#00f2fe" sparkRadius={26}>
+                <Link to="/parking">
+                  <Button size="lg" className="shadow-[0_0_24px_rgba(6,182,212,0.35)] hover:shadow-[0_0_32px_rgba(6,182,212,0.5)] transition-shadow">
+                    Book parking <ArrowRight />
+                  </Button>
+                </Link>
+              </ClickSpark>
               <Link to="/parking">
                 <Button size="lg" variant="heroOutline">
                   Explore parking
@@ -203,46 +239,96 @@ export function HomePage() {
               </Link>
             </div>
           </div>
-          <div className="page-reveal glass-panel self-end rounded-2xl p-6 text-hero-foreground shadow-2xl [animation-delay:180ms]">
+          <SpotlightCard
+            spotlightColor="rgba(6, 182, 212, 0.28)"
+            spotlightSize={500}
+            borderColor="rgba(6, 182, 212, 0.5)"
+            className="page-reveal self-end rounded-2xl border-white/10 bg-surface/75 backdrop-blur-2xl p-6 text-hero-foreground shadow-2xl [animation-delay:180ms]"
+          >
             <div className="flex items-center justify-between">
               <div>
                 <p className="font-mono text-[10px] uppercase tracking-widest text-hero-muted">
                   Live availability
                 </p>
-                <p className="mt-1 font-display text-4xl font-semibold">
-                  73 <span className="text-base font-normal text-hero-muted">spaces</span>
-                </p>
+                <div className="mt-1 flex items-baseline gap-2">
+                  <span className="font-display text-4xl font-semibold">
+                    <CountUp to={availableSlots} duration={1.8} />
+                  </span>
+                  <span className="text-base font-normal text-hero-muted">spaces</span>
+                </div>
               </div>
-              <div className="availability-ring grid size-20 place-items-center rounded-full shadow-inner">
-                <span className="font-mono text-sm font-semibold">49%</span>
+              {/* Dynamic circular availability gauge */}
+              <div
+                className="relative grid size-20 place-items-center"
+                role="progressbar"
+                aria-valuenow={percentage}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-label={`Live availability: ${percentage}%`}
+              >
+                <svg className="size-full -rotate-90" viewBox="0 0 80 80" aria-hidden="true">
+                  {/* Subtle track ring */}
+                  <circle
+                    cx="40"
+                    cy="40"
+                    r="32"
+                    className="stroke-white/10"
+                    strokeWidth="6"
+                    fill="none"
+                  />
+                  {/* Dynamic neon green progress arc */}
+                  <circle
+                    cx="40"
+                    cy="40"
+                    r="32"
+                    stroke="var(--available)"
+                    strokeWidth="6"
+                    strokeDasharray={201.06}
+                    strokeDashoffset={201.06 * (1 - Math.min(Math.max(percentage, 0), 100) / 100)}
+                    strokeLinecap="round"
+                    fill="none"
+                    className="transition-all duration-1000 ease-out"
+                    style={{
+                      filter: "drop-shadow(0 0 6px oklch(0.61 0.17 151 / 0.45))",
+                    }}
+                  />
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="font-mono text-sm font-semibold text-primary">
+                    <CountUp to={percentage} suffix="%" duration={1.6} />
+                  </span>
+                </div>
               </div>
             </div>
             <div className="mt-5 grid grid-cols-3 gap-2 border-t border-hero-line pt-4">
               {[
-                ["Occupied", "62", "text-occupied"],
-                ["Reserved", "15", "text-reserved"],
-                ["EV ready", "4", "text-ev"],
-              ].map(([label, value, tone]) => (
+                { label: "Occupied", value: occupiedSlots, tone: "text-occupied" },
+                { label: "Reserved", value: reservedSlots, tone: "text-reserved" },
+                { label: "EV ready", value: evReadySlots, tone: "text-ev" },
+              ].map(({ label, value, tone }) => (
                 <div key={label}>
-                  <strong className={cn("block font-display text-xl", tone)}>{value}</strong>
+                  <strong className={cn("block font-display text-xl", tone)}>
+                    <CountUp to={value} duration={1.4} />
+                  </strong>
                   <span className="text-[10px] text-hero-muted">{label}</span>
                 </div>
               ))}
             </div>
             <p className="mt-4 flex items-center gap-2 text-[10px] text-hero-muted">
-              <span className="live-dot" /> Live sync · Updated just now
+              <span className="live-dot" />{" "}
+              <span className="font-mono">Live sync · Updated real-time</span>
             </p>
-          </div>
+          </SpotlightCard>
         </div>
       </section>
       <section className="border-b border-border bg-surface">
         <div className="mx-auto grid max-w-[1440px] divide-y divide-border px-6 sm:grid-cols-4 sm:divide-x sm:divide-y-0 lg:px-10">
           {[
-            ["150", "Total slots"],
-            ["73", "Available"],
-            ["62", "Occupied"],
-            ["15", "Reserved"],
-          ].map(([value, label], i) => (
+            { value: totalSlots, label: "Total slots" },
+            { value: availableSlots, label: "Available" },
+            { value: occupiedSlots, label: "Occupied" },
+            { value: reservedSlots, label: "Reserved" },
+          ].map(({ value, label }, i) => (
             <div key={label} className="px-5 py-8 first:pl-0">
               <div className="flex items-end justify-between">
                 <strong
@@ -253,7 +339,7 @@ export function HomePage() {
                     i === 3 && "text-reserved",
                   )}
                 >
-                  {value}
+                  <CountUp to={value} duration={1.6} delay={0.1 * i} />
                 </strong>
                 <CarFront className="size-5 text-muted-foreground" />
               </div>
@@ -273,11 +359,15 @@ export function HomePage() {
               title="See where you'll park before you arrive."
               copy="Every bay reports its live state. Green spaces are ready now; choose one to begin your booking."
             />
-            <Link to="/parking" className="mt-7 inline-block">
-              <Button>
-                View full parking map <ArrowRight />
-              </Button>
-            </Link>
+            <div className="mt-7 inline-block">
+              <ClickSpark sparkColor="#00f2fe" sparkRadius={24}>
+                <Link to="/parking">
+                  <Button className="shadow-sm">
+                    View full parking map <ArrowRight />
+                  </Button>
+                </Link>
+              </ClickSpark>
+            </div>
           </div>
           <ParkingMap preview />
         </div>
@@ -308,14 +398,18 @@ export function HomePage() {
             {facilities.map(([title, copy], i) => {
               const Icon = iconSet[i] ?? ShieldCheck;
               return (
-                <article
+                <SpotlightCard
                   key={title}
-                  className="group interactive-lift rounded-xl border border-border/80 bg-card p-6 shadow-sm transition-all duration-200 hover:border-primary/40 hover:-translate-y-0.5"
+                  spotlightColor="rgba(6, 182, 212, 0.16)"
+                  borderColor="rgba(6, 182, 212, 0.3)"
+                  className="group rounded-2xl bg-card/90 p-6 shadow-sm transition-all duration-300 hover:-translate-y-1"
                 >
-                  <Icon className="size-6 text-primary transition group-hover:scale-110" />
-                  <h3 className="mt-6 font-display text-lg font-semibold">{title}</h3>
+                  <div className="size-11 rounded-xl bg-primary/10 border border-primary/20 grid place-items-center transition-transform duration-300 group-hover:scale-110">
+                    <Icon className="size-6 text-primary" />
+                  </div>
+                  <h3 className="mt-6 font-display text-lg font-semibold text-foreground">{title}</h3>
                   <p className="mt-2 text-sm leading-6 text-muted-foreground">{copy}</p>
-                </article>
+                </SpotlightCard>
               );
             })}
           </div>
@@ -631,15 +725,19 @@ function ParkingBooking({ initialSlot }: { initialSlot: ParkingSlotData }) {
           onLevelChange={setLevel}
         />
         <aside className="space-y-4">
-          <div
+          <SpotlightCard
             key={selected.id}
+            spotlightColor="rgba(6, 182, 212, 0.2)"
+            borderColor="rgba(6, 182, 212, 0.4)"
             className="selection-pulse rounded-2xl border border-border/80 bg-surface/95 p-6 shadow-sm"
           >
             <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
               Selected bay
             </p>
             <div className="mt-3 flex items-center justify-between">
-              <strong className="font-display text-4xl">{selected.id}</strong>
+              <strong className="font-display text-4xl">
+                {selected.id}
+              </strong>
               <StatusBadge status={isSelectedAvailable ? "available" : "occupied"} />
             </div>
             {!isSelectedAvailable && (
@@ -660,8 +758,12 @@ function ParkingBooking({ initialSlot }: { initialSlot: ParkingSlotData }) {
                 value={`${formatIstTime(startIso)} – ${formatIstTime(endIso)}`}
               />
             </dl>
-          </div>
-          <div className="sticky top-24 rounded-2xl border border-primary/30 bg-primary/5 p-6 shadow-sm backdrop-blur-sm">
+          </SpotlightCard>
+          <SpotlightCard
+            spotlightColor="rgba(6, 182, 212, 0.25)"
+            borderColor="rgba(6, 182, 212, 0.5)"
+            className="sticky top-24 rounded-2xl border border-primary/30 bg-primary/5 p-6 shadow-sm backdrop-blur-sm"
+          >
             <p className="font-mono text-[10px] uppercase tracking-widest text-primary font-semibold">
               Booking summary
             </p>
@@ -673,7 +775,7 @@ function ParkingBooking({ initialSlot }: { initialSlot: ParkingSlotData }) {
               </div>
             </div>
             {valid ? (
-              <Button size="lg" className="mt-6 w-full" onClick={handleContinue}>
+              <Button size="lg" className="mt-6 w-full shadow-md" onClick={handleContinue}>
                 Continue <ArrowRight className="transition-transform group-hover:translate-x-1" />
               </Button>
             ) : (
@@ -684,7 +786,7 @@ function ParkingBooking({ initialSlot }: { initialSlot: ParkingSlotData }) {
             <p className="mt-3 flex items-center justify-center gap-1.5 text-[10px] text-muted-foreground">
               <LockKeyhole className="size-3" /> Secure instant checkout
             </p>
-          </div>
+          </SpotlightCard>
         </aside>
       </div>
     </PageFrame>
@@ -702,14 +804,21 @@ export function FacilitiesPage() {
         {facilities.map(([title, copy], i) => {
           const Icon = iconSet[i] ?? ShieldCheck;
           return (
-            <article key={title} className="interactive-lift border border-border bg-surface p-6">
-              <Icon className="size-7 text-primary" />
-              <h2 className="mt-8 font-display text-xl font-semibold">{title}</h2>
+            <SpotlightCard
+              key={title}
+              spotlightColor="rgba(6, 182, 212, 0.18)"
+              borderColor="rgba(6, 182, 212, 0.35)"
+              className="rounded-2xl border border-border/80 bg-card p-6 shadow-sm transition-all duration-300 hover:-translate-y-1"
+            >
+              <div className="size-12 rounded-xl bg-primary/10 border border-primary/20 grid place-items-center mb-6">
+                <Icon className="size-6 text-primary" />
+              </div>
+              <h2 className="font-display text-xl font-semibold text-foreground">{title}</h2>
               <p className="mt-3 text-sm leading-6 text-muted-foreground">{copy}</p>
-              <span className="mt-8 flex items-center gap-1 font-mono text-[10px] uppercase text-available">
+              <span className="mt-6 inline-flex items-center gap-1.5 font-mono text-[10px] uppercase text-available">
                 <Check className="size-3" /> Available now
               </span>
-            </article>
+            </SpotlightCard>
           );
         })}
       </div>
@@ -2757,10 +2866,14 @@ export function EVPage() {
   ];
   return (
     <PageFrame eyebrow="Charge while you park" title="EV charging">
-      <div className="mb-8 grid gap-6 rounded-2xl border border-ev/30 bg-ev/5 p-7 shadow-sm lg:grid-cols-2">
+      <SpotlightCard
+        spotlightColor="rgba(16, 185, 129, 0.2)"
+        borderColor="rgba(16, 185, 129, 0.4)"
+        className="mb-8 grid gap-6 rounded-2xl border border-ev/30 bg-ev/5 p-7 shadow-sm lg:grid-cols-2"
+      >
         <div>
           <BatteryCharging className="size-10 text-ev" />
-          <h2 className="mt-5 font-display text-3xl">Fast, monitored charging</h2>
+          <h2 className="mt-5 font-display text-3xl font-bold">Fast, monitored charging</h2>
           <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground">
             Track live energy, time, and cost from your parking session. CCS and Type 2 connectors
             available.
@@ -2768,14 +2881,18 @@ export function EVPage() {
         </div>
         <div className="battery-meter self-center">
           <span style={{ width: "68%" }} />
-          <strong>68%</strong>
+          <strong className="font-mono">
+            <CountUp to={68} suffix="%" duration={1.8} />
+          </strong>
         </div>
-      </div>
+      </SpotlightCard>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {chargers.map((c) => (
-          <article
+          <SpotlightCard
             key={c.id}
-            className="interactive-lift rounded-2xl border border-border/80 bg-surface/90 p-6 shadow-sm transition-all hover:border-ev/40"
+            spotlightColor="rgba(16, 185, 129, 0.22)"
+            borderColor="rgba(16, 185, 129, 0.45)"
+            className="rounded-2xl border border-border/80 bg-card p-6 shadow-sm transition-all duration-300 hover:-translate-y-1"
           >
             <div className="flex justify-between items-center">
               <Zap className="size-6 text-ev" />
@@ -2787,15 +2904,17 @@ export function EVPage() {
             <h2 className="font-display text-3xl font-bold">{c.id}</h2>
             <div className="mt-5 flex justify-between text-sm">
               <span className="text-muted-foreground">Connector: CCS2</span>
-              <strong>{c.power}</strong>
+              <strong className="font-mono">{c.power}</strong>
             </div>
             <p className="mt-2 text-xs font-mono text-muted-foreground">Tariff: ₹12/kWh</p>
-            <Link to="/parking">
-              <Button className="mt-6 w-full" disabled={c.status !== "available"}>
-                Book charger
-              </Button>
-            </Link>
-          </article>
+            <div className="mt-6 w-full">
+              <Link to="/parking" className="w-full block">
+                <Button className="w-full shadow-sm" disabled={c.status !== "available"}>
+                  Book charger
+                </Button>
+              </Link>
+            </div>
+          </SpotlightCard>
         ))}
       </div>
     </PageFrame>

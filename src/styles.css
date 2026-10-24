@@ -525,9 +525,10 @@
     backdrop-filter: blur(18px);
   }
   .availability-ring {
+    --ring-pct: 100%;
     background:
       radial-gradient(circle at center, var(--hero-surface) 58%, transparent 59%),
-      conic-gradient(var(--available) 0 49%, oklch(1 0 0 / 15%) 49% 100%);
+      conic-gradient(var(--available) 0 var(--ring-pct), oklch(1 0 0 / 15%) var(--ring-pct) 100%);
   }
   .live-dot {
     display: inline-block;

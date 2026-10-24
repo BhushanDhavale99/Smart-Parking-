@@ -28,6 +28,7 @@ import parkGridLogo from "@/assets/parkgrid-logo.png";
 import { AnimatedLogo } from "@/components/animated-logo";
 import { ThemeSelector } from "@/components/ThemeSelector";
 import { NavigationProgress } from "@/components/navigation-progress";
+import { ClickSpark } from "@/components/react-bits";
 import { useRealtimeSync } from "@/lib/realtime";
 import { RootSplash } from "@/components/root-splash";
 import { useQueryClient } from "@tanstack/react-query";
@@ -446,11 +447,13 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
                 </Button>
               </Link>
             )}
-            <Link to="/parking">
-              <Button className="magnetic-cta">
-                Book now <ArrowUpRight className="transition-transform group-hover:translate-x-1" />
-              </Button>
-            </Link>
+            <ClickSpark sparkColor="#00f2fe" sparkRadius={20}>
+              <Link to="/parking">
+                <Button className="magnetic-cta shadow-sm">
+                  Book now <ArrowUpRight className="transition-transform group-hover:translate-x-1" />
+                </Button>
+              </Link>
+            </ClickSpark>
             <Button
               size="icon"
               variant="ghost"

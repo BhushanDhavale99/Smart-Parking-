@@ -20,6 +20,7 @@ import parkGridLogo from "@/assets/parkgrid-logo.png";
 import { soundFX } from "@/components/effects/soundEffects";
 import { Lightspeed } from "@/components/effects/Lightspeed";
 import { AnimatedLogo } from "@/components/animated-logo";
+import { SpotlightCard, Aurora, ClickSpark } from "@/components/react-bits";
 import "./LoginPage.css";
 
 interface LoginPageProps {
@@ -231,13 +232,21 @@ export function LoginPage({
       </div>
 
       {/* ── Background Aesthetics ── */}
+      <Aurora className="opacity-35 z-0" />
       <div className="login-grid-bg" aria-hidden="true" />
       <div className="login-glow-primary" aria-hidden="true" />
       <div className="login-glow-secondary" aria-hidden="true" />
       <div className="login-road-stripes" aria-hidden="true" />
 
       {/* ── Main Glassmorphic Login Card ── */}
-      <div className="login-glass-card" role="region" aria-label="Sign In to ParkGrid">
+      <SpotlightCard
+        spotlightColor="rgba(0, 229, 255, 0.22)"
+        spotlightSize={420}
+        borderColor="rgba(0, 229, 255, 0.5)"
+        className="login-glass-card border-white/10"
+        role="region"
+        aria-label="Sign In to ParkGrid"
+      >
         {/* Top Branding Header */}
         <div className="text-center mb-6">
           <div className="inline-flex items-center justify-center p-2 rounded-xl bg-background/60 border border-primary/40 shadow-[0_0_24px_rgba(0,242,254,0.2)] mb-3.5">
@@ -251,7 +260,7 @@ export function LoginPage({
 
           <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-primary flex items-center justify-center gap-1.5 mb-1.5">
             <span className="live-dot" aria-hidden="true" />
-            ParkGrid Secure Access // BKC • Mumbai
+            <span className="text-primary font-mono">ParkGrid Secure Access // BKC • Mumbai</span>
           </p>
 
           <h1 className="font-display text-2xl sm:text-3xl font-bold tracking-tight text-white">
@@ -430,24 +439,26 @@ export function LoginPage({
           </div>
 
           {/* Primary Submit Button */}
-          <button type="submit" disabled={isLoading} className="login-submit-btn mt-4">
-            {isLoading && loadingMethod === "email" ? (
-              <>
-                <RefreshCw className="size-4 animate-spin text-slate-900" />
-                <span>Authenticating with ParkGrid Hub...</span>
-              </>
-            ) : mode === "signin" ? (
-              <>
-                <span>Login to ParkGrid</span>
-                <ArrowRight className="size-4" />
-              </>
-            ) : (
-              <>
-                <span>Create Account</span>
-                <ShieldCheck className="size-4" />
-              </>
-            )}
-          </button>
+          <ClickSpark sparkColor="#00f2fe" sparkRadius={26} className="w-full">
+            <button type="submit" disabled={isLoading} className="login-submit-btn mt-4">
+              {isLoading && loadingMethod === "email" ? (
+                <>
+                  <RefreshCw className="size-4 animate-spin text-slate-900" />
+                  <span>Authenticating with ParkGrid Hub...</span>
+                </>
+              ) : mode === "signin" ? (
+                <>
+                  <span className="font-semibold text-slate-950">Login to ParkGrid</span>
+                  <ArrowRight className="size-4 text-slate-950" />
+                </>
+              ) : (
+                <>
+                  <span className="font-semibold text-slate-950">Create Account</span>
+                  <ShieldCheck className="size-4 text-slate-950" />
+                </>
+              )}
+            </button>
+          </ClickSpark>
         </form>
 
         {/* 256-bit encrypted label */}
@@ -487,7 +498,7 @@ export function LoginPage({
             </p>
           )}
         </div>
-      </div>
+      </SpotlightCard>
 
       {/* ── Forgot Password Dialog ── */}
       {forgotModalOpen && (

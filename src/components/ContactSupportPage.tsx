@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { SpotlightCard } from "@/components/react-bits";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -267,7 +268,11 @@ export function ContactSupportPage() {
         {/* ── Two Column Layout: Support Form & Information Panel ── */}
         <div className="grid gap-10 lg:grid-cols-[1fr_400px]">
           {/* Left: Support Form */}
-          <div className="border border-border bg-surface p-6 sm:p-8">
+          <SpotlightCard
+            spotlightColor="rgba(6, 182, 212, 0.16)"
+            borderColor="rgba(6, 182, 212, 0.35)"
+            className="rounded-2xl border border-border/80 bg-surface/90 p-6 sm:p-8 shadow-sm"
+          >
             <div className="mb-6 border-b border-border pb-5">
               <h2 className="font-display text-2xl font-semibold">Submit a Support Request</h2>
               <p className="mt-1 text-xs text-muted-foreground">
@@ -417,7 +422,7 @@ export function ContactSupportPage() {
                 <p className="text-[11px] text-muted-foreground">
                   🔒 Encrypted transmission · Official ticket generated with SLA tracking.
                 </p>
-                <Button type="submit" size="lg" disabled={isSubmitting} className="min-w-44">
+                <Button type="submit" size="lg" disabled={isSubmitting} className="min-w-44 shadow-sm">
                   {isSubmitting ? (
                     <>
                       <RefreshCw className="size-4 animate-spin" /> Submitting...
@@ -430,12 +435,16 @@ export function ContactSupportPage() {
                 </Button>
               </div>
             </form>
-          </div>
+          </SpotlightCard>
 
           {/* Right Column: Direct Contact & Recent Tickets */}
           <div className="space-y-6">
             {/* 24/7 Control Room Hub */}
-            <div className="interactive-lift border border-border bg-surface p-6">
+            <SpotlightCard
+              spotlightColor="rgba(6, 182, 212, 0.18)"
+              borderColor="rgba(6, 182, 212, 0.35)"
+              className="rounded-2xl border border-border/80 bg-surface/90 p-6 shadow-sm"
+            >
               <span className="font-mono text-[10px] uppercase tracking-widest text-primary">
                 Immediate Assistance
               </span>
@@ -499,10 +508,14 @@ export function ContactSupportPage() {
                   </div>
                 </div>
               </div>
-            </div>
+            </SpotlightCard>
 
             {/* AI Assistant Quick Callout */}
-            <div className="interactive-lift border border-border/80 bg-primary/5 p-6">
+            <SpotlightCard
+              spotlightColor="rgba(6, 182, 212, 0.22)"
+              borderColor="rgba(6, 182, 212, 0.45)"
+              className="rounded-2xl border border-primary/30 bg-primary/5 p-6 shadow-sm"
+            >
               <div className="flex items-center gap-2 text-primary">
                 <Bot className="size-5" />
                 <strong className="font-display text-lg">Instant AI Answers</strong>
@@ -516,7 +529,7 @@ export function ContactSupportPage() {
                   Chat with Parking AI <ArrowRight className="size-3.5" />
                 </Button>
               </Link>
-            </div>
+            </SpotlightCard>
           </div>
         </div>
 
